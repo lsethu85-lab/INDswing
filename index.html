@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Swing Trade Dashboard + TradingView Chat AI Picks - Powered by Sethu</title>
+  <style>
+    :root {
+      --bg: #06101d;
+      --panel: #0f172a;
+      --panel2: #121d37;
+      --line: rgba(148, 163, 184, 0.18);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --blue: #38bdf8;
+      --cyan: #67e8f9;
+      --green: #22c55e;
+      --red: #ef4444;
+      --amber: #f59e0b;
+      --violet: #8b5cf6;
+      --shadow: 0 16px 42px rgba(2, 6, 23, 0.35);
+      --radius: 18px;
+      --btn: linear-gradient(135deg, #0ea5e9, #2563eb);
+      --btn2: linear-gradient(135deg, #22c55e, #16a34a);
+      --btn3: linear-gradient(135deg, #7c3aed, #2563eb);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.14), transparent 25%),
+        radial-gradient(circle at top right, rgba(139, 92, 246, 0.16), transparent 23%),
+        linear-gradient(180deg, #020617, #07111f 45%, #020617);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .container { width: min(1500px, calc(100% - 30px)); margin: 22px auto 40px; }
+    .card {
+      background: linear-gradient(180deg, rgba(15,23,42,0.96), rgba(15,23,42,0.88));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+    .hero { display:grid; grid-template-columns: 1.25fr 0.95fr; gap: 18px; margin-bottom: 20px; }
+    .hero .left { padding: 26px; }
+    .hero .right { padding: 22px; display:flex; flex-direction:column; justify-content:space-between; }
+    .eyebrow {
+      display:inline-flex; align-items:center; gap:8px; border-radius:999px; padding:8px 12px;
+      background: rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.18); color:#bfeaff;
+      text-transform: uppercase; letter-spacing:.06em; font-size:12px; font-weight:800;
+    }
+    h1 { font-size: clamp(28px, 4vw, 42px); line-height: 1.05; margin: 14px 0 10px; letter-spacing: -0.02em; }
+    .lead { margin: 0; color: #cbd5e1; line-height: 1.7; font-size: 14.5px; }
+    .branding { margin-top: 10px; color: var(--blue); font-size: 12.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+    .small { font-size: 12px; color: var(--muted); }
+    .grid-5 { display:grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 14px; margin-top: 18px; }
+    .stat { background: rgba(15,23,42,.9); border:1px solid var(--line); border-radius: 16px; padding: 16px; }
+    .stat .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing:.06em; }
+    .stat .value { font-size: 28px; font-weight: 800; margin-top: 12px; }
+    .stat .sub { margin-top: 7px; font-size: 12.5px; color: #cbd5e1; }
+    .tabs { display:flex; flex-wrap:wrap; gap:10px; margin-bottom: 16px; }
+    .tab {
+      appearance:none; border:1px solid var(--line); background: rgba(15,23,42,.75); color: var(--text);
+      padding: 11px 16px; border-radius: 999px; font-weight:800; cursor:pointer; transition:.2s ease;
+    }
+    .tab.active { background: var(--btn); border-color: rgba(255,255,255,.08); }
+    .section { display:none; }
+    .section.active { display:block; }
+    .toolbar { display:grid; grid-template-columns: 1.1fr 1fr auto auto auto; gap:12px; margin-bottom:16px; }
+    .input, .select, textarea {
+      width:100%; background: rgba(15,23,42,.78); border:1px solid var(--line); color: var(--text);
+      border-radius:14px; padding: 12px 14px; outline:none; font: inherit;
+    }
+    textarea { resize: vertical; min-height: 170px; }
+    .btn {
+      appearance:none; border:none; background: var(--btn); color:white; padding: 12px 14px; border-radius:14px;
+      font-weight:800; cursor:pointer; box-shadow: var(--shadow); transition: transform .15s ease, opacity .2s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn.secondary { background: linear-gradient(135deg, #1e293b, #334155); }
+    .btn.success { background: var(--btn2); }
+    .btn.violet { background: var(--btn3); }
+    .btn:disabled { opacity: .45; cursor:not-allowed; transform:none; }
+    .chip { display:inline-flex; align-items:center; gap:6px; padding:7px 10px; border-radius:999px; font-size:11.5px; font-weight:800; letter-spacing:.03em; border:1px solid rgba(148,163,184,.15); white-space:nowrap; }
+    .chip.ok { background: rgba(34,197,94,.12); color:#86efac; border-color: rgba(34,197,94,.2); }
+    .chip.no { background: rgba(239,68,68,.1); color:#fca5a5; border-color: rgba(239,68,68,.2); }
+    .chip.info { background: rgba(56,189,248,.12); color:#bfeaff; }
+    .chip.violet { background: rgba(139,92,246,.12); color:#c4b5fd; border-color: rgba(139,92,246,.18); }
+    .stocks-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(320px,1fr)); gap: 16px; }
+    .stock-card { padding:18px; position:relative; overflow:hidden; transition: all .25s ease; }
+    .stock-card.active { border: 1px solid rgba(56, 189, 248, 0.85); box-shadow: 0 0 0 1px rgba(56,189,248,.16), 0 14px 32px rgba(14,165,233,.18); }
+    .stock-card.target { border: 1px solid rgba(34, 197, 94, 0.95); background: linear-gradient(180deg, rgba(34,197,94,0.16), rgba(15,23,42,0.92)); box-shadow: 0 0 0 1px rgba(34,197,94,.18), 0 16px 34px rgba(34,197,94,.24); }
+    .stock-card.stop { border: 1px solid rgba(239, 68, 68, 0.95); background: linear-gradient(180deg, rgba(239,68,68,0.18), rgba(15,23,42,0.92)); box-shadow: 0 0 0 1px rgba(239,68,68,.18), 0 16px 34px rgba(239,68,68,.24); }
+    .stock-card.target, .stock-card.stop { animation: pulseGlow 2.2s ease-in-out infinite; }
+    @keyframes pulseGlow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1px); } }
+    .chart-btn { min-width: 38px; padding: 9px 10px; display:inline-flex; align-items:center; justify-content:center; font-size: 15px; }
+    .status-line { margin-top:8px; display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+    .status-badge { padding: 6px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 800; letter-spacing: .02em; border: 1px solid rgba(148,163,184,.18); }
+    .status-badge.active { color:#7dd3fc; background: rgba(56,189,248,.12); border-color: rgba(56,189,248,.26); }
+    .status-badge.target { color:#86efac; background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.28); }
+    .status-badge.stop { color:#fca5a5; background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.28); }
+    .status-badge.neutral { color:#cbd5e1; background: rgba(148,163,184,.10); }
+    .live-pill { display:inline-flex; align-items:center; gap:6px; margin-top:8px; font-size:11px; font-weight:800; color:#7dd3fc; text-transform:uppercase; letter-spacing:.05em; }
+    .live-dot { width:8px; height:8px; border-radius:999px; background:#22c55e; box-shadow: 0 0 0 5px rgba(34,197,94,.12); }
+    .goal-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px; margin-top:10px; }
+    .goal-tile { background: rgba(2, 6, 23, .26); border:1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+    .goal-tile .k { color: var(--muted); font-size: 12px; }
+    .goal-tile .v { margin-top: 6px; font-weight: 800; }
+    .stock-card::after { content:""; position:absolute; width:230px; height:230px; right:-90px; top:-115px; background: radial-gradient(circle, rgba(56,189,248,.10), transparent 60%); pointer-events:none; }
+    .row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .ticker { font-size: 22px; font-weight: 800; }
+    .name { color:#cbd5e1; font-size: 13px; margin-top: 3px; }
+    .metrics { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px; margin-top:16px; }
+    .metric { background: rgba(15,23,42,.62); border:1px solid var(--line); border-radius:12px; padding:10px 12px; }
+    .metric .k { color: var(--muted); font-size:12px; }
+    .metric .v { margin-top:6px; font-weight:800; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+    .mini-note { margin-top:10px; font-size:12px; color:var(--muted); line-height:1.5; }
+    .two-col { display:grid; grid-template-columns: 1.2fr .8fr; gap: 18px; }
+    .three-col { display:grid; grid-template-columns: 1.2fr .85fr .85fr; gap: 18px; }
+    .panel-pad { padding:18px; }
+    .list { overflow:hidden; border-radius: var(--radius); }
+    table { width:100%; border-collapse: collapse; background: rgba(15,23,42,.85); }
+    thead th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); background: rgba(30,41,59,.9); position: sticky; top: 0; }
+    th, td { padding: 14px 12px; border-bottom: 1px solid var(--line); text-align:left; font-size:14px; vertical-align: top; }
+    tbody tr:hover { background: rgba(30,41,59,.38); }
+    .filter-list { display:grid; gap:10px; max-height: 560px; overflow:auto; }
+    .filter-item { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:12px 14px; background: rgba(15,23,42,.72); border:1px solid var(--line); border-radius:14px; }
+    .positive { color:#86efac; }
+    .negative { color:#fda4af; }
+    .neutral { color:#e2e8f0; }
+    .empty { padding: 28px; text-align:center; color:#cbd5e1; }
+    .tight { line-height: 1.4; }
+    .right-stack { display:grid; gap:18px; }
+    .kv { display:grid; grid-template-columns: 1fr auto; gap: 10px; padding: 10px 0; border-bottom: 1px dashed rgba(148,163,184,.12); }
+    .kv:last-child { border-bottom: none; }
+    .badge { padding: 5px 8px; border-radius: 10px; background: rgba(148,163,184,.12); font-weight:700; font-size:12px; }
+    .tv-preview {
+      min-height: 340px; border-radius: 16px; overflow:hidden; border:1px solid var(--line); background:#0b1220;
+      display:flex; align-items:center; justify-content:center; text-align:center; padding:10px;
+    }
+    iframe { width:100%; min-height:340px; border:0; border-radius:16px; }
+    @media (max-width: 1200px) {
+      .hero, .two-col, .three-col { grid-template-columns: 1fr; }
+      .toolbar { grid-template-columns: 1fr 1fr; }
+      .grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 760px) {
+      .container { width: min(100% - 20px, 1500px); }
+      .toolbar, .metrics, .grid-5 { grid-template-columns: 1fr; }
+      .stocks-grid { grid-template-columns: 1fr; }
+      th:nth-child(6), td:nth-child(6), th:nth-child(8), td:nth-child(8), th:nth-child(9), td:nth-child(9) { display:none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <div class="card left">
+        <span class="eyebrow">Swing Trade Dashboard + TV Chat AI</span>
+        <h1>AI-driven live picks from <span style="color:#7dd3fc;">TradingView-style chat / ideas flow</span> with <span style="color:#86efac;">My Virtual Holdings</span></h1>
+        <p class="lead">
+          This version keeps your full swing filter engine, then adds a new AI layer that reads TradingView-style chat / ideas text,
+          scores ticker mentions, detects bullish and bearish language, and promotes higher-conviction names into a live-picks queue.
+          You can paste ideas text manually now, or later connect the same parser to a webhook / export feed.
+        </p>
+        <div class="branding">Powered by Sethu</div>
+        <div class="grid-5">
+          <div class="stat"><div class="label">Stock Universe</div><div class="value" id="statUniverse">0</div><div class="sub">Loaded sample or imported symbols</div></div>
+          <div class="stat"><div class="label">Swing Candidates</div><div class="value" id="statCandidates">0</div><div class="sub">Pass all hard filters</div></div>
+          <div class="stat"><div class="label">TV AI Live Picks</div><div class="value" id="statAiPicks">0</div><div class="sub">Chat-weighted setups</div></div>
+          <div class="stat"><div class="label">Virtual Positions</div><div class="value" id="statPositions">0</div><div class="sub">Paper trades being tracked</div></div>
+          <div class="stat"><div class="label">Unrealised P/L</div><div class="value" id="statPnL">₹0</div><div class="sub" id="statPnLSub">Across all virtual holdings</div></div>
+        </div>
+      </div>
+      <div class="card right">
+        <div>
+          <div class="row" style="align-items:flex-start;">
+            <div>
+              <div class="small" style="text-transform:uppercase; letter-spacing:.06em; font-weight:800;">AI overlay logic</div>
+              <div style="font-size:24px;font-weight:800;margin-top:8px;">Hard screener + sentiment + mention frequency</div>
+            </div>
+            <span class="chip violet">TV Chat AI</span>
+          </div>
+          <div class="mini-note">
+            Hard filters still protect quality. The AI layer only adjusts priority and timing by reading symbols, breakout language,
+            higher-high / support / volume cues, and bearish warnings from pasted TradingView-style chat or ideas text.
+          </div>
+        </div>
+        <div>
+          <div class="actions">
+            <button class="btn secondary" id="btnLoadDemo">Load Demo Universe</button>
+            <label class="btn" for="universeFile" style="display:inline-flex;align-items:center;justify-content:center;">Import Universe JSON</label>
+            <input id="universeFile" type="file" accept="application/json" hidden />
+          </div>
+          <div class="mini-note" style="margin-top:16px;">
+            Built to be portable with save / load JSON, just like your other dashboards.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="dashboard">Dashboard</button>
+      <button class="tab" data-tab="candidates">Swing Picks</button>
+      <button class="tab" data-tab="tvai">TV Chat AI</button>
+      <button class="tab" data-tab="holdings">My Virtual Holdings</button>
+      <button class="tab" data-tab="rules">Filter Rules</button>
+    </div>
+
+    <section id="dashboard" class="section active">
+      <div class="toolbar">
+        <input class="input" id="searchInput" placeholder="Search by symbol or company name" />
+        <select class="select" id="sortBy">
+          <option value="aiLiveScore-desc">Sort: AI live score ↓</option>
+          <option value="symbol">Sort: Symbol</option>
+          <option value="currentPrice-desc">Sort: Price high to low</option>
+          <option value="currentPrice-asc">Sort: Price low to high</option>
+          <option value="marketCap-desc">Sort: Market cap</option>
+          <option value="score-desc">Sort: Hard filter pass score</option>
+        </select>
+        <button class="btn secondary" id="btnExportUniverse">Export Universe</button>
+        <button class="btn secondary" id="btnResetHoldings">Clear Virtual Holdings</button>
+        <button class="btn violet" id="btnGoTvAi">Open TV Chat AI</button>
+      </div>
+      <div class="stocks-grid" id="stockGrid"></div>
+    </section>
+
+    <section id="candidates" class="section">
+      <div class="two-col">
+        <div class="card panel-pad">
+          <div class="row" style="margin-bottom:14px;">
+            <div>
+              <div class="small">Hard AND filter engine</div>
+              <div style="font-size:24px;font-weight:800;margin-top:4px;">Eligible swing picks</div>
+            </div>
+            <span class="chip ok" id="candidateCountPill">0 candidates</span>
+          </div>
+          <div class="list">
+            <table>
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>Company</th>
+                  <th>Price</th>
+                  <th>ROCE</th>
+                  <th>ROE</th>
+                  <th>Debt/Equity</th>
+                  <th>Trend</th>
+                  <th>TV AI</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="candidatesBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card panel-pad">
+          <div class="small">Pass / fail breakdown</div>
+          <div style="font-size:24px;font-weight:800;margin-top:4px;">Rule summary</div>
+          <div class="mini-note">Every stock must pass all rules to enter Swing Picks. TV Chat AI only ranks and highlights conviction on top of this.</div>
+          <div class="filter-list" id="ruleSummaryList" style="margin-top:16px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tvai" class="section">
+      <div class="three-col">
+        <div class="card panel-pad">
+          <div class="row" style="margin-bottom:14px;">
+            <div>
+              <div class="small">Paste TradingView-style chat / ideas / notes</div>
+              <div style="font-size:24px;font-weight:800;margin-top:4px;">TV Chat AI parser</div>
+            </div>
+            <span class="chip violet" id="chatLineCount">0 lines</span>
+          </div>
+          <textarea id="tvChatInput" placeholder="Example:
+NSE:BEL breakout above 320, volume expansion, bullish continuation.
+TRENT looks extended near resistance, watch pullback to DMA50.
+CDSL strong higher highs, buy on dips, momentum intact."></textarea>
+          <div class="actions">
+            <button class="btn violet" id="btnParseTvChat">Parse Chat → AI Picks</button>
+            <button class="btn secondary" id="btnLoadDemoTvChat">Load Demo TV Chat</button>
+            <button class="btn secondary" id="btnClearTvChat">Clear</button>
+          </div>
+          <div class="mini-note">
+            Parsing logic is local and transparent: it counts symbol mentions, bullish / bearish keywords, breakout phrases,
+            and combines that with your hard screener + trend rules. Best fit for pasted text, exported posts, or future webhook payloads.
+          </div>
+        </div>
+
+        <div class="card panel-pad">
+          <div class="small">Ranked focus list</div>
+          <div style="font-size:24px;font-weight:800;margin-top:4px;">AI Live Picks</div>
+          <div class="list" style="margin-top:16px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Symbol</th>
+                  <th>AI Score</th>
+                  <th>Bias</th>
+                  <th>Add</th>
+                </tr>
+              </thead>
+              <tbody id="tvAiBody"></tbody>
+            </table>
+          </div>
+          <div class="mini-note">Only names with positive AI score and hard-filter support are promoted here.</div>
+        </div>
+
+        <div class="right-stack">
+          <div class="card panel-pad">
+            <div class="small">Selected symbol</div>
+            <div style="font-size:24px;font-weight:800;margin-top:4px;" id="selectedSymbolTitle">TradingView Preview</div>
+            <div class="tv-preview" id="tvPreviewContainer">
+              <div>
+                <div style="font-size:18px;font-weight:800;">No symbol selected</div>
+                <div class="mini-note">Choose an AI live pick to open a TradingView-style preview link.</div>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="btn secondary" id="btnOpenTradingView">Open TradingView</button>
+            </div>
+          </div>
+          <div class="card panel-pad">
+            <div class="small">AI explanation</div>
+            <div style="font-size:24px;font-weight:800;margin-top:4px;">Why this moved up</div>
+            <div class="filter-list" id="aiReasonList" style="margin-top:16px;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="holdings" class="section">
+      <div class="two-col">
+        <div class="card panel-pad">
+          <div class="row" style="margin-bottom:14px;">
+            <div>
+              <div class="small">Paper trading journal</div>
+              <div style="font-size:24px;font-weight:800;margin-top:4px;">My Virtual Holdings</div>
+            </div>
+            <div class="actions" style="margin-top:0;">
+              <button class="btn secondary" id="btnExportHoldings">Export Holdings</button>
+              <label class="btn" for="holdingsFile" style="display:inline-flex;align-items:center;justify-content:center;">Import Holdings</label>
+              <input id="holdingsFile" type="file" accept="application/json" hidden />
+            </div>
+          </div>
+          <div class="list">
+            <table>
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>Company</th>
+                  <th>Qty</th>
+                  <th>Buy Price</th>
+                  <th>Current Price</th>
+                  <th>Invested</th>
+                  <th>Current Value</th>
+                  <th>P/L</th>
+                  <th>Target</th>
+                  <th>Stop Loss</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="holdingsBody"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="holdingsEmpty" style="display:none;">No virtual holdings yet. Add a swing pick or AI live pick.</div>
+        </div>
+        <div class="card panel-pad">
+          <div class="small">Quick add / edit</div>
+          <div style="font-size:24px;font-weight:800;margin-top:4px;">Position editor</div>
+          <div class="mini-note">The Add button from stock cards and AI live picks prefills this form.</div>
+          <div style="display:grid;gap:10px;margin-top:16px;">
+            <select class="select" id="formSymbol"></select>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <input class="input" id="formQty" type="number" min="1" step="1" placeholder="Quantity" />
+              <input class="input" id="formBuyPrice" type="number" min="0" step="0.01" placeholder="Buy price" />
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <input class="input" id="formTarget" type="number" min="0" step="0.01" placeholder="Target" />
+              <input class="input" id="formStopLoss" type="number" min="0" step="0.01" placeholder="Stop loss" />
+            </div>
+            <textarea class="input" id="formNotes" rows="4" placeholder="Trade thesis / AI note"></textarea>
+            <div class="actions" style="margin-top:4px;">
+              <button class="btn success" id="btnSaveHolding">Save to Virtual Holdings</button>
+              <button class="btn secondary" id="btnPrefillAiPick">Prefill from top AI pick</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="rules" class="section">
+      <div class="card panel-pad">
+        <div class="small">Your exact hard filter logic</div>
+        <div style="font-size:26px;font-weight:800;margin-top:4px;">Swing trade filter rules</div>
+        <div class="mini-note" style="margin-bottom:16px;">Every condition is encoded as-requested. TV Chat AI sits on top as an optional ranking engine, not as a replacement.</div>
+        <div class="filter-list" id="fullRulesList"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const STORAGE_KEYS = {
+      universe: 'swing-tv-ai-universe-v2',
+      holdings: 'swing-tv-ai-holdings-v2',
+      tvChat: 'swing-tv-ai-chat-v2'
+    };
+
+    const RULES = [
+      { key: 'marketCap', label: 'Market Capitalization > 1000', test: s => s.marketCap > 1000 },
+      { key: 'currentPriceMin', label: 'Current price > 100', test: s => s.currentPrice > 100 },
+      { key: 'currentPriceMax', label: 'Current price < 5000', test: s => s.currentPrice < 5000 },
+      { key: 'roce', label: 'Return on capital employed > 15', test: s => s.roce > 15 },
+      { key: 'roe', label: 'Return on equity > 12', test: s => s.roe > 12 },
+      { key: 'debtToEquity', label: 'Debt to equity < 1', test: s => s.debtToEquity < 1 },
+      { key: 'interestCoverageRatio', label: 'Interest Coverage Ratio > 3', test: s => s.interestCoverageRatio > 3 },
+      { key: 'salesGrowth3Y', label: 'Sales growth 3 years > 10', test: s => s.salesGrowth3Y > 10 },
+      { key: 'profitGrowth3Y', label: 'Profit growth 3 years > 12', test: s => s.profitGrowth3Y > 12 },
+      { key: 'priceAboveDma50', label: 'Current price > DMA 50', test: s => s.currentPrice > s.dma50 },
+      { key: 'dma50AboveDma200', label: 'DMA 50 > DMA 200', test: s => s.dma50 > s.dma200 },
+      { key: 'volume1MAvg', label: 'Volume 1 month average > 200000', test: s => s.volume1MAvg > 200000 },
+      { key: 'promoterHolding', label: 'Promoter holding > 40', test: s => s.promoterHolding > 40 },
+      { key: 'pledgedPct', label: 'Pledged percentage < 2', test: s => s.pledgedPct < 2 },
+      { key: 'freeCashFlowLastYear', label: 'Free cash flow last year > 0', test: s => s.freeCashFlowLastYear > 0 },
+      { key: 'priceVsPrevDma50', label: 'Current price <= 1.2 × DMA 50 previous day', test: s => s.currentPrice <= 1.2 * s.dma50PrevDay }
+    ];
+
+    const sentimentLexicon = {
+      bullish: ['buy', 'bullish', 'breakout', 'accumulate', 'add', 'strong', 'continuation', 'higher highs', 'momentum', 'support holding', 'volume expansion', 'uptrend'],
+      bearish: ['sell', 'bearish', 'avoid', 'breakdown', 'weak', 'exit', 'distribution', 'lower lows', 'resistance', 'extended', 'overbought', 'failed breakout'],
+      trigger: ['entry', 'trigger', 'above', 'cross', 'retest', 'bounce', 'pullback', 'watch', 'close above']
+    };
+
+    const demoUniverse = [
+      { symbol:'TRENT', company:'Trent Ltd', marketCap:217400, currentPrice:4680, roce:27.8, roe:22.6, debtToEquity:0.16, interestCoverageRatio:15.8, salesGrowth3Y:34.2, profitGrowth3Y:28.6, dma50:4450, dma200:3820, volume1MAvg:615000, promoterHolding:49.9, pledgedPct:0, freeCashFlowLastYear:845, dma50PrevDay:4430 },
+      { symbol:'BEL', company:'Bharat Electronics', marketCap:243700, currentPrice:322, roce:28.1, roe:24.3, debtToEquity:0.02, interestCoverageRatio:55, salesGrowth3Y:16.4, profitGrowth3Y:18.9, dma50:298, dma200:266, volume1MAvg:7400000, promoterHolding:51.1, pledgedPct:0, freeCashFlowLastYear:1920, dma50PrevDay:297 },
+      { symbol:'CDSL', company:'Central Depository Services', marketCap:35200, currentPrice:1710, roce:44.1, roe:31.8, debtToEquity:0, interestCoverageRatio:99, salesGrowth3Y:21.1, profitGrowth3Y:22.7, dma50:1624, dma200:1490, volume1MAvg:428000, promoterHolding:55.2, pledgedPct:0, freeCashFlowLastYear:410, dma50PrevDay:1618 },
+      { symbol:'ABB', company:'ABB India', marketCap:189500, currentPrice:7345, roce:32.5, roe:25.9, debtToEquity:0.03, interestCoverageRatio:48.2, salesGrowth3Y:20.4, profitGrowth3Y:26.2, dma50:6980, dma200:6225, volume1MAvg:214000, promoterHolding:75, pledgedPct:0, freeCashFlowLastYear:1300, dma50PrevDay:6964 },
+      { symbol:'AIAENG', company:'AIA Engineering', marketCap:32100, currentPrice:3690, roce:23.2, roe:17.1, debtToEquity:0.02, interestCoverageRatio:38.5, salesGrowth3Y:11.4, profitGrowth3Y:14.7, dma50:3505, dma200:3328, volume1MAvg:238000, promoterHolding:58.9, pledgedPct:0, freeCashFlowLastYear:590, dma50PrevDay:3498 },
+      { symbol:'KPITTECH', company:'KPIT Technologies', marketCap:41020, currentPrice:1568, roce:34.6, roe:26.8, debtToEquity:0.14, interestCoverageRatio:12.4, salesGrowth3Y:29, profitGrowth3Y:37.5, dma50:1488, dma200:1326, volume1MAvg:594000, promoterHolding:40.1, pledgedPct:0, freeCashFlowLastYear:522, dma50PrevDay:1482 },
+      { symbol:'LT', company:'Larsen & Toubro', marketCap:483000, currentPrice:3925, roce:15.4, roe:14.1, debtToEquity:1.13, interestCoverageRatio:3.6, salesGrowth3Y:13.1, profitGrowth3Y:15.2, dma50:3844, dma200:3572, volume1MAvg:1200000, promoterHolding:0, pledgedPct:0, freeCashFlowLastYear:2100, dma50PrevDay:3838 },
+      { symbol:'TCS', company:'Tata Consultancy Services', marketCap:1361000, currentPrice:4195, roce:58, roe:47.1, debtToEquity:0.08, interestCoverageRatio:66, salesGrowth3Y:12.8, profitGrowth3Y:10.1, dma50:4105, dma200:3960, volume1MAvg:1850000, promoterHolding:71.7, pledgedPct:0, freeCashFlowLastYear:47750, dma50PrevDay:4090 },
+      { symbol:'GODFRYPHLP', company:'Godfrey Phillips', marketCap:35400, currentPrice:3075, roce:32.8, roe:23.5, debtToEquity:0.02, interestCoverageRatio:26.7, salesGrowth3Y:13.4, profitGrowth3Y:16.5, dma50:2832, dma200:2410, volume1MAvg:226000, promoterHolding:72.6, pledgedPct:0, freeCashFlowLastYear:388, dma50PrevDay:2814 },
+      { symbol:'HINDZINC', company:'Hindustan Zinc', marketCap:191300, currentPrice:599, roce:48.2, roe:37.2, debtToEquity:0.14, interestCoverageRatio:28, salesGrowth3Y:12.1, profitGrowth3Y:13.5, dma50:552, dma200:471, volume1MAvg:3210000, promoterHolding:64.9, pledgedPct:0, freeCashFlowLastYear:9312, dma50PrevDay:549 },
+      { symbol:'VBL', company:'Varun Beverages', marketCap:184200, currentPrice:1435, roce:20.8, roe:19.7, debtToEquity:0.68, interestCoverageRatio:6.9, salesGrowth3Y:23.6, profitGrowth3Y:29.2, dma50:1398, dma200:1268, volume1MAvg:1640000, promoterHolding:60.2, pledgedPct:0, freeCashFlowLastYear:950, dma50PrevDay:1392 }
+    ];
+
+    const demoTvChat = `
+NSE:BEL breakout above 320 with volume expansion and bullish continuation.
+TRENT looks strong on dips, support holding near dma50, buy on shallow pullback.
+CDSL higher highs with momentum intact, accumulation on retest.
+TCS good quality but momentum softer, watch only, not strong enough.
+LT extended near resistance and debt profile weaker, avoid fresh entry.
+HINDZINC breakout continuation, bullish trend, strong follow-through.
+VBL support bounce, trend intact, add above trigger candle high.
+`;
+
+    let stockUniverse = loadFromStorage(STORAGE_KEYS.universe, demoUniverse);
+    let virtualHoldings = loadFromStorage(STORAGE_KEYS.holdings, []);
+    let tvChatText = loadFromStorage(STORAGE_KEYS.tvChat, demoTvChat.trim());
+
+let selectedTvSymbol = null;
+// Optional GitHub Pages / backend proxy config:
+// window.STOCK_WS_CONFIG = {
+//   url: 'wss://YOUR-RENDER-SERVICE.onrender.com/ws'
+// };
+// Optional HTTP fallback config:
+// window.STOCK_API_CONFIG = {
+//   endpoint: 'https://YOUR-RENDER-SERVICE.onrender.com/api/quotes',
+//   symbolsSuffix: '.NS'
+// };
+let livePrices = {};
+let livePriceMeta = { provider: 'demo', lastUpdated: null, ok: false };
+let liveSocket = null;
+let liveSocketReconnectAttempts = 0;
+let liveSocketManualClose = false;
+const LIVE_PRICE_CONFIG = {
+  refreshMs: 15000,
+  endpoint: (window.STOCK_API_CONFIG && window.STOCK_API_CONFIG.endpoint) || '',
+  symbolsSuffix: (window.STOCK_API_CONFIG && window.STOCK_API_CONFIG.symbolsSuffix) || '.NS'
+};
+const LIVE_WS_CONFIG = {
+  url: (window.STOCK_WS_CONFIG && window.STOCK_WS_CONFIG.url) || '',
+  reconnectBaseMs: 1000,
+  maxReconnectMs: 30000
+};
+function getLivePrice(symbol, fallback) {
+  const value = livePrices[symbol];
+  return Number.isFinite(value) ? value : Number(fallback || 0);
+}
+function openChart(symbol) {
+  window.open(`https://www.tradingview.com/chart/?symbol=NSE:${encodeURIComponent(symbol)}`, '_blank', 'noopener');
+}
+function getHolding(symbol) {
+  return virtualHoldings.find(h => h.symbol === symbol) || null;
+}
+function getTradeStatus(stock, holding) {
+  if (!holding) return 'neutral';
+  const price = getLivePrice(stock.symbol, stock.currentPrice);
+  if (Number(holding.target) > 0 && price >= Number(holding.target)) return 'target';
+  if (Number(holding.stopLoss) > 0 && price <= Number(holding.stopLoss)) return 'stop';
+  return 'active';
+}
+function getStatusLabel(status) {
+  return status === 'target' ? '✅ Target Hit' : status === 'stop' ? '❌ Stop Hit' : status === 'active' ? '🟡 Active Trade' : 'No Virtual Trade';
+}
+function updateUniversePrices(priceMap) {
+  if (!priceMap || typeof priceMap !== 'object') return;
+  stockUniverse = stockUniverse.map(stock => {
+    const live = Number(priceMap[stock.symbol]);
+    return Number.isFinite(live) && live > 0 ? { ...stock, currentPrice: live } : stock;
+  });
+}
+function getLiveConnectionLabel() {
+  if (liveSocket && liveSocket.readyState === WebSocket.OPEN) return 'Realtime stream live';
+  if (LIVE_WS_CONFIG.url) return 'Realtime stream reconnecting';
+  return livePriceMeta.ok ? 'Live price sync' : 'Using local price cache';
+}
+function broadcastSymbolsPayload() {
+  return stockUniverse.map(s => `${s.symbol}${LIVE_PRICE_CONFIG.symbolsSuffix}`);
+}
+function handleStreamPriceMap(priceMap) {
+  if (!priceMap || typeof priceMap !== 'object' || !Object.keys(priceMap).length) return;
+  livePrices = { ...livePrices, ...priceMap };
+  updateUniversePrices(priceMap);
+  livePriceMeta = { provider: 'websocket', lastUpdated: new Date().toISOString(), ok: true };
+  redraw();
+}
+function scheduleLiveReconnect() {
+  if (!LIVE_WS_CONFIG.url || liveSocketManualClose) return;
+  liveSocketReconnectAttempts += 1;
+  const delay = Math.min(LIVE_WS_CONFIG.reconnectBaseMs * (2 ** (liveSocketReconnectAttempts - 1)), LIVE_WS_CONFIG.maxReconnectMs);
+  window.setTimeout(connectLiveStream, delay);
+}
+function connectLiveStream() {
+  if (!LIVE_WS_CONFIG.url || typeof WebSocket === 'undefined') return;
+  try {
+    if (liveSocket && (liveSocket.readyState === WebSocket.OPEN || liveSocket.readyState === WebSocket.CONNECTING)) return;
+    liveSocket = new WebSocket(LIVE_WS_CONFIG.url);
+    liveSocket.onopen = () => {
+      liveSocketReconnectAttempts = 0;
+      livePriceMeta = { provider: 'websocket', lastUpdated: new Date().toISOString(), ok: true };
+      liveSocket.send(JSON.stringify({ type: 'subscribe', symbols: broadcastSymbolsPayload() }));
+      redraw();
+    };
+    liveSocket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === 'price' && payload.symbol && Number.isFinite(Number(payload.price))) {
+          handleStreamPriceMap({ [String(payload.symbol).replace(LIVE_PRICE_CONFIG.symbolsSuffix, '')]: Number(payload.price) });
+        } else if (payload.type === 'batch' && payload.prices && typeof payload.prices === 'object') {
+          const normalized = {};
+          Object.entries(payload.prices).forEach(([symbol, price]) => {
+            const clean = String(symbol).replace(LIVE_PRICE_CONFIG.symbolsSuffix, '');
+            const num = Number(price);
+            if (Number.isFinite(num)) normalized[clean] = num;
+          });
+          handleStreamPriceMap(normalized);
+        } else if (payload.type === 'subscribed') {
+          livePriceMeta = { provider: 'websocket', lastUpdated: new Date().toISOString(), ok: true };
+          redraw();
+        }
+      } catch (error) {
+        console.warn('Invalid WebSocket payload', error);
+      }
+    };
+    liveSocket.onerror = () => {
+      livePriceMeta = { provider: 'websocket', lastUpdated: new Date().toISOString(), ok: false };
+    };
+    liveSocket.onclose = () => {
+      livePriceMeta = { provider: 'websocket', lastUpdated: new Date().toISOString(), ok: false };
+      redraw();
+      scheduleLiveReconnect();
+    };
+  } catch (error) {
+    console.warn('Live WebSocket connection failed', error);
+    scheduleLiveReconnect();
+  }
+}
+async function fetchLivePrices() {
+  const endpoint = (window.STOCK_API_CONFIG && window.STOCK_API_CONFIG.endpoint) || LIVE_PRICE_CONFIG.endpoint;
+  if (!endpoint) return;
+  try {
+    const symbols = stockUniverse.map(s => `${s.symbol}${LIVE_PRICE_CONFIG.symbolsSuffix}`);
+    const separator = endpoint.includes('?') ? '&' : '?';
+    const res = await fetch(`${endpoint}${separator}symbols=${encodeURIComponent(symbols.join(','))}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const priceMap = {};
+    if (Array.isArray(data?.quotes)) {
+      data.quotes.forEach(q => {
+        const raw = String(q.symbol || '').replace(LIVE_PRICE_CONFIG.symbolsSuffix, '');
+        const price = Number(q.price);
+        if (raw && Number.isFinite(price)) priceMap[raw] = price;
+      });
+    } else if (data && typeof data === 'object') {
+      Object.entries(data).forEach(([symbol, price]) => {
+        const value = Number(price);
+        if (Number.isFinite(value)) priceMap[symbol] = value;
+      });
+    }
+    if (Object.keys(priceMap).length) {
+      livePrices = { ...livePrices, ...priceMap };
+      updateUniversePrices(priceMap);
+      livePriceMeta = { provider: 'custom-endpoint', lastUpdated: new Date().toISOString(), ok: true };
+      redraw();
+    }
+  } catch (error) {
+    console.warn('Live HTTP price fetch failed.', error);
+    livePriceMeta = { provider: 'custom-endpoint', lastUpdated: new Date().toISOString(), ok: false };
+  }
+}
+
+    function loadFromStorage(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : structuredClone(fallback);
+      } catch {
+        return structuredClone(fallback);
+      }
+    }
+    function saveToStorage(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
+    function currency(n) { return new Intl.NumberFormat('en-IN',{style:'currency', currency:'INR', maximumFractionDigits:2}).format(Number(n || 0)); }
+    function number(n, digits = 2) { return new Intl.NumberFormat('en-IN',{maximumFractionDigits:digits}).format(Number(n || 0)); }
+    function getStock(symbol) { return stockUniverse.find(s => s.symbol === symbol); }
+
+    function evaluateStock(stock) {
+      const checks = RULES.map(rule => ({ ...rule, pass: Boolean(rule.test(stock)) }));
+      const passCount = checks.filter(c => c.pass).length;
+      const candidate = passCount === RULES.length;
+      return { stock, checks, passCount, candidate };
+    }
+    function currentEvaluations() { return stockUniverse.map(evaluateStock); }
+    function currentCandidates() { return currentEvaluations().filter(x => x.candidate).map(x => x.stock); }
+    function passesTrend(stock) { return stock.currentPrice > stock.dma50 && stock.dma50 > stock.dma200; }
+
+    function tokenize(text) {
+      return text.toLowerCase().replace(/[^a-z0-9:\s.\-]/g, ' ').split(/\s+/).filter(Boolean);
+    }
+
+    function parseTvChat(text) {
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const scoreMap = {};
+      const reasonsMap = {};
+      const stocksBySymbol = Object.fromEntries(stockUniverse.map(s => [s.symbol, s]));
+      const universeSymbols = Object.keys(stocksBySymbol);
+
+      universeSymbols.forEach(sym => {
+        scoreMap[sym] = { mentions: 0, bullish: 0, bearish: 0, trigger: 0, rawScore: 0, lines: [] };
+        reasonsMap[sym] = [];
+      });
+
+      lines.forEach((line, idx) => {
+        const low = line.toLowerCase();
+        const detectedSymbols = new Set();
+        universeSymbols.forEach(sym => {
+          const patterns = [sym, `nse:${sym}`, `bse:${sym}`];
+          if (patterns.some(p => low.includes(p.toLowerCase()))) detectedSymbols.add(sym);
+        });
+
+        if (!detectedSymbols.size) return;
+
+        const bullHits = sentimentLexicon.bullish.filter(w => low.includes(w)).length;
+        const bearHits = sentimentLexicon.bearish.filter(w => low.includes(w)).length;
+        const trigHits = sentimentLexicon.trigger.filter(w => low.includes(w)).length;
+
+        detectedSymbols.forEach(sym => {
+          scoreMap[sym].mentions += 1;
+          scoreMap[sym].bullish += bullHits;
+          scoreMap[sym].bearish += bearHits;
+          scoreMap[sym].trigger += trigHits;
+          scoreMap[sym].rawScore += 16 + (bullHits * 9) + (trigHits * 4) - (bearHits * 8);
+          scoreMap[sym].lines.push({ lineNo: idx + 1, text: line });
+        });
+      });
+
+      const evaluations = currentEvaluations();
+      return evaluations.map(ev => {
+        const data = scoreMap[ev.stock.symbol] || { mentions:0, bullish:0, bearish:0, trigger:0, rawScore:0, lines:[] };
+        const hardBoost = ev.candidate ? 55 : (ev.passCount >= 13 ? 18 : -12);
+        const trendBoost = passesTrend(ev.stock) ? 12 : -8;
+        const stretchPenalty = ev.stock.currentPrice <= 1.2 * ev.stock.dma50PrevDay ? 5 : -12;
+        const aiLiveScore = Math.max(0, data.rawScore + hardBoost + trendBoost + stretchPenalty);
+        const bias = aiLiveScore >= 90 ? 'High Conviction Buy' : aiLiveScore >= 65 ? 'Buy Watch' : aiLiveScore >= 40 ? 'Watchlist' : 'Low Priority';
+        const reasons = [];
+        if (ev.candidate) reasons.push('Passes all hard swing filters');
+        else reasons.push(`Pass score ${ev.passCount}/${RULES.length}`);
+        if (data.mentions) reasons.push(`Mentioned ${data.mentions} time(s) in TV chat feed`);
+        if (data.bullish) reasons.push(`${data.bullish} bullish keyword hit(s)`);
+        if (data.bearish) reasons.push(`${data.bearish} bearish keyword hit(s)`);
+        if (data.trigger) reasons.push(`${data.trigger} trigger / entry cue hit(s)`);
+        if (passesTrend(ev.stock)) reasons.push('Trend structure intact: price > DMA50 > DMA200');
+        if (ev.stock.currentPrice <= 1.2 * ev.stock.dma50PrevDay) reasons.push('Not too extended vs previous DMA50 cap');
+        return {
+          ...ev,
+          tv: data,
+          aiLiveScore,
+          bias,
+          reasons,
+          candidateAndPositive: ev.candidate && aiLiveScore >= 40
+        };
+      }).sort((a, b) => b.aiLiveScore - a.aiLiveScore);
+    }
+
+    function getAiRankings() {
+      return parseTvChat(document.getElementById('tvChatInput').value || '');
+    }
+
+    function activateTab(tabId) {
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.tab === tabId));
+      document.querySelectorAll('.section').forEach(sec => sec.classList.toggle('active', sec.id === tabId));
+    }
+
+function renderDashboard() {
+  const grid = document.getElementById('stockGrid');
+  const search = document.getElementById('searchInput').value.trim().toLowerCase();
+  const sortBy = document.getElementById('sortBy').value;
+  let evaluations = getAiRankings();
+  if (search) {
+    evaluations = evaluations.filter(({ stock }) => stock.symbol.toLowerCase().includes(search) || stock.company.toLowerCase().includes(search));
+  }
+  const [sortField, sortDir = 'asc'] = sortBy.split('-');
+  evaluations.sort((a, b) => {
+    const av = sortField === 'score' ? a.passCount : (sortField === 'aiLiveScore' ? a.aiLiveScore : a.stock[sortField]);
+    const bv = sortField === 'score' ? b.passCount : (sortField === 'aiLiveScore' ? b.aiLiveScore : b.stock[sortField]);
+    if (typeof av === 'string') return av.localeCompare(bv);
+    return sortDir === 'desc' ? bv - av : av - bv;
+  });
+  grid.innerHTML = evaluations.map(({ stock, candidate, passCount, aiLiveScore, bias, tv }) => {
+    const holding = getHolding(stock.symbol);
+    const status = getTradeStatus(stock, holding);
+    const livePrice = getLivePrice(stock.symbol, stock.currentPrice);
+    const distanceToTarget = holding?.target ? ((Number(holding.target) - livePrice) / livePrice) * 100 : null;
+    const distanceToStop = holding?.stopLoss ? ((livePrice - Number(holding.stopLoss)) / livePrice) * 100 : null;
+    return `
+    <article class="card stock-card ${status}">
+      <div class="row">
+        <div>
+          <div class="ticker">${stock.symbol}</div>
+          <div class="name">${stock.company}</div>
+          <div class="live-pill"><span class="live-dot"></span>${getLiveConnectionLabel()}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button class="btn secondary chart-btn" title="Open TradingView chart" onclick="openChart('${stock.symbol}')">📈</button>
+          <span class="chip ${candidate ? 'ok' : 'no'}">${candidate ? 'Swing Pick' : `${passCount}/${RULES.length} pass`}</span>
+        </div>
+      </div>
+      <div class="metrics">
+        <div class="metric"><div class="k">Live Price</div><div class="v">${currency(livePrice)}</div></div>
+        <div class="metric"><div class="k">TV AI Score</div><div class="v">${number(aiLiveScore, 0)}</div></div>
+        <div class="metric"><div class="k">ROCE / ROE</div><div class="v">${number(stock.roce)}% / ${number(stock.roe)}%</div></div>
+        <div class="metric"><div class="k">Mentions / Bull / Bear</div><div class="v">${tv.mentions} / ${tv.bullish} / ${tv.bearish}</div></div>
+        <div class="metric"><div class="k">DMA 50 / DMA 200</div><div class="v">${number(stock.dma50)} / ${number(stock.dma200)}</div></div>
+        <div class="metric"><div class="k">Bias</div><div class="v">${bias}</div></div>
+      </div>
+      ${holding ? `
+        <div class="goal-grid">
+          <div class="goal-tile"><div class="k">Target</div><div class="v">${currency(holding.target || 0)}</div></div>
+          <div class="goal-tile"><div class="k">Stop Loss</div><div class="v">${currency(holding.stopLoss || 0)}</div></div>
+        </div>
+        <div class="status-line">
+          <span class="status-badge ${status}">${getStatusLabel(status)}</span>
+          ${holding.target ? `<span class="small">Target gap: <span class="${distanceToTarget !== null && distanceToTarget <= 0 ? 'positive' : 'neutral'}">${distanceToTarget !== null ? number(distanceToTarget, 2) : '-'}%</span></span>` : ''}
+          ${holding.stopLoss ? `<span class="small">Stop buffer: <span class="${distanceToStop !== null && distanceToStop <= 0 ? 'negative' : 'neutral'}">${distanceToStop !== null ? number(distanceToStop, 2) : '-'}%</span></span>` : ''}
+        </div>
+      ` : ''}
+      <div class="actions">
+        <button class="btn success" ${candidate ? '' : 'disabled'} onclick="quickAdd('${stock.symbol}')">Add to My Virtual Holdings</button>
+        <button class="btn violet" onclick="selectAiSymbol('${stock.symbol}')">TV AI Detail</button>
+      </div>
+      <div class="mini-note tight">
+        Trend: <span class="${passesTrend(stock) ? 'positive' : 'negative'}">${passesTrend(stock) ? 'Price > DMA50 > DMA200' : 'Trend rule not fully met'}</span><br>
+        Chat mentions: ${tv.mentions}. Bullish keywords: ${tv.bullish}. Bearish warnings: ${tv.bearish}.
+      </div>
+    </article>
+  `;
+  }).join('') || '<div class="card empty">No stocks match your search.</div>';
+}
+
+    function renderCandidates() {
+      const candidates = getAiRankings().filter(x => x.candidate);
+      document.getElementById('candidateCountPill').textContent = `${candidates.length} candidate${candidates.length === 1 ? '' : 's'}`;
+      const body = document.getElementById('candidatesBody');
+      body.innerHTML = candidates.map(item => `
+        <tr>
+          <td><strong>${item.stock.symbol}</strong></td>
+          <td>${item.stock.company}</td>
+          <td>${currency(getLivePrice(item.stock.symbol, item.stock.currentPrice))}</td>
+          <td>${number(item.stock.roce)}%</td>
+          <td>${number(item.stock.roe)}%</td>
+          <td>${number(item.stock.debtToEquity)}</td>
+          <td>${passesTrend(item.stock) ? '<span class="badge positive">Aligned</span>' : '<span class="badge negative">Weak</span>'}</td>
+          <td>${number(item.aiLiveScore, 0)} · ${item.bias}</td>
+          <td><button class="btn success" onclick="quickAdd('${item.stock.symbol}')">Add</button></td>
+        </tr>
+      `).join('') || '<tr><td colspan="9" class="empty">No swing candidates in the current universe.</td></tr>';
+    }
+
+    function renderRuleSummary() {
+      const list = document.getElementById('ruleSummaryList');
+      const evaluations = currentEvaluations();
+      list.innerHTML = RULES.map(rule => {
+        const passed = evaluations.filter(e => e.checks.find(c => c.key === rule.key)?.pass).length;
+        const ratio = `${passed}/${evaluations.length || 0}`;
+        return `
+          <div class="filter-item">
+            <div>
+              <div style="font-weight:800;">${rule.label}</div>
+              <div class="small">Stocks passing this rule: ${ratio}</div>
+            </div>
+            <span class="chip ${passed === evaluations.length && evaluations.length ? 'ok' : passed ? 'info' : 'no'}">${ratio}</span>
+          </div>`;
+      }).join('');
+
+      document.getElementById('fullRulesList').innerHTML = RULES.map((rule, idx) => `
+        <div class="filter-item">
+          <div>
+            <div style="font-weight:800;">${idx + 1}. ${rule.label}</div>
+            <div class="small">Applied as a mandatory AND condition in the swing screener.</div>
+          </div>
+          <span class="chip info">Mandatory</span>
+        </div>`).join('');
+    }
+
+    function renderTvAi() {
+      const text = document.getElementById('tvChatInput').value || '';
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      document.getElementById('chatLineCount').textContent = `${lines.length} line${lines.length === 1 ? '' : 's'}`;
+      const rankings = getAiRankings().filter(x => x.candidateAndPositive).slice(0, 20);
+      const body = document.getElementById('tvAiBody');
+      body.innerHTML = rankings.map((item, idx) => `
+        <tr>
+          <td>${idx + 1}</td>
+          <td><button class="btn secondary" style="padding:8px 10px;" onclick="selectAiSymbol('${item.stock.symbol}')">${item.stock.symbol}</button></td>
+          <td>${number(item.aiLiveScore, 0)}</td>
+          <td>${item.bias}</td>
+          <td><button class="btn success" onclick="quickAdd('${item.stock.symbol}')">Add</button></td>
+        </tr>`).join('') || '<tr><td colspan="5" class="empty">No AI live picks yet. Paste chat text and parse it.</td></tr>';
+
+      if (!selectedTvSymbol && rankings[0]) selectedTvSymbol = rankings[0].stock.symbol;
+      renderTvPreview();
+      renderAiReasons();
+    }
+
+    function renderTvPreview() {
+      const container = document.getElementById('tvPreviewContainer');
+      const title = document.getElementById('selectedSymbolTitle');
+      const stock = selectedTvSymbol ? getStock(selectedTvSymbol) : null;
+      if (!stock) {
+        title.textContent = 'TradingView Preview';
+        container.innerHTML = '<div><div style="font-size:18px;font-weight:800;">No symbol selected</div><div class="mini-note">Choose an AI live pick to preview.</div></div>';
+        return;
+      }
+      title.textContent = `${stock.symbol} · TradingView Preview Link`;
+      const url = `https://www.tradingview.com/chart/?symbol=NSE%3A${encodeURIComponent(stock.symbol)}`;
+      container.innerHTML = `
+        <div style="width:100%;">
+          <div style="padding:10px 12px; text-align:left; border-bottom:1px solid var(--line); font-weight:800;">${stock.symbol} · ${stock.company}</div>
+          <div style="padding:18px; text-align:left;">
+            <div class="kv"><span class="small">Live price</span><strong>${currency(getLivePrice(stock.symbol, stock.currentPrice))}</strong></div>
+            <div class="kv"><span class="small">DMA50 / DMA200</span><strong>${number(stock.dma50)} / ${number(stock.dma200)}</strong></div>
+            <div class="kv"><span class="small">ROCE / ROE</span><strong>${number(stock.roce)}% / ${number(stock.roe)}%</strong></div>
+            <div class="kv"><span class="small">TradingView link</span><a href="${url}" target="_blank" rel="noopener" style="color:#7dd3fc;">Open chart ↗</a></div>
+          </div>
+        </div>`;
+    }
+
+    function renderAiReasons() {
+      const list = document.getElementById('aiReasonList');
+      const stock = selectedTvSymbol ? getAiRankings().find(x => x.stock.symbol === selectedTvSymbol) : null;
+      if (!stock) {
+        list.innerHTML = '<div class="filter-item"><div>No AI explanation available yet.</div><span class="chip info">Awaiting input</span></div>';
+        return;
+      }
+      const lineItems = stock.tv.lines.length ? stock.tv.lines.map(l => `<div class="filter-item"><div><div style="font-weight:800;">Chat line ${l.lineNo}</div><div class="small">${escapeHtml(l.text)}</div></div><span class="chip info">Context</span></div>`).join('') : '';
+      list.innerHTML = stock.reasons.map(reason => `<div class="filter-item"><div style="font-weight:800;">${escapeHtml(reason)}</div><span class="chip violet">AI</span></div>`).join('') + lineItems;
+    }
+
+function renderHoldings() {
+  const body = document.getElementById('holdingsBody');
+  const empty = document.getElementById('holdingsEmpty');
+  if (!virtualHoldings.length) {
+    body.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  body.innerHTML = virtualHoldings.map((h, index) => {
+    const stock = getStock(h.symbol) || {};
+    const currentPrice = Number(getLivePrice(h.symbol, stock.currentPrice ?? h.buyPrice ?? 0));
+    const invested = Number(h.qty) * Number(h.buyPrice);
+    const currentValue = Number(h.qty) * currentPrice;
+    const pnl = currentValue - invested;
+    const status = getTradeStatus({ symbol: h.symbol, currentPrice }, h);
+    return `
+      <tr>
+        <td><strong>${h.symbol}</strong></td>
+        <td>${stock.company || h.company || '-'}</td>
+        <td>${number(h.qty,0)}</td>
+        <td>${currency(h.buyPrice)}</td>
+        <td>${currency(currentPrice)}</td>
+        <td>${currency(invested)}</td>
+        <td>${currency(currentValue)}</td>
+        <td class="${pnl >= 0 ? 'positive' : 'negative'}">${currency(pnl)}</td>
+        <td><div>${h.target ? currency(h.target) : '-'}</div>${status === 'target' ? '<div class="small positive">Hit</div>' : ''}</td>
+        <td><div>${h.stopLoss ? currency(h.stopLoss) : '-'}</div>${status === 'stop' ? '<div class="small negative">Hit</div>' : ''}</td>
+        <td><div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="btn secondary" onclick="editHolding(${index})">Edit</button><button class="btn" onclick="removeHolding(${index})">Remove</button></div></td>
+      </tr>`;
+  }).join('');
+}
+
+    function renderStats() {
+      const candidates = currentCandidates();
+      const aiPicks = getAiRankings().filter(x => x.candidateAndPositive).length;
+      document.getElementById('statUniverse').textContent = stockUniverse.length;
+      document.getElementById('statCandidates').textContent = candidates.length;
+      document.getElementById('statAiPicks').textContent = aiPicks;
+      document.getElementById('statPositions').textContent = virtualHoldings.length;
+      const pnl = virtualHoldings.reduce((sum, h) => {
+        const stock = getStock(h.symbol) || {};
+        const currentPrice = Number(getLivePrice(h.symbol, stock.currentPrice ?? h.buyPrice ?? 0));
+        return sum + (Number(h.qty) * currentPrice) - (Number(h.qty) * Number(h.buyPrice));
+      }, 0);
+      const pnlEl = document.getElementById('statPnL');
+      pnlEl.textContent = currency(pnl);
+      pnlEl.classList.remove('positive','negative','neutral');
+      pnlEl.classList.add(pnl >= 0 ? 'positive' : 'negative');
+      document.getElementById('statPnLSub').textContent = pnl >= 0 ? 'Paper profits across virtual positions' : 'Paper drawdown across virtual positions';
+    }
+
+    function renderSymbolOptions() {
+      const select = document.getElementById('formSymbol');
+      const symbols = stockUniverse.map(s => s.symbol).sort();
+      select.innerHTML = symbols.map(sym => `<option value="${sym}">${sym} - ${(getStock(sym) || {}).company || ''}</option>`).join('');
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>\"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+    }
+
+    function redraw() {
+      saveToStorage(STORAGE_KEYS.universe, stockUniverse);
+      saveToStorage(STORAGE_KEYS.holdings, virtualHoldings);
+      saveToStorage(STORAGE_KEYS.tvChat, document.getElementById('tvChatInput').value || '');
+      renderStats();
+      renderDashboard();
+      renderCandidates();
+      renderRuleSummary();
+      renderTvAi();
+      renderHoldings();
+      renderSymbolOptions();
+    }
+
+function quickAdd(symbol) {
+  const stock = getStock(symbol);
+  if (!stock) return;
+  const ai = getAiRankings().find(x => x.stock.symbol === symbol);
+  const livePrice = getLivePrice(symbol, stock.currentPrice);
+  document.getElementById('formSymbol').value = symbol;
+  document.getElementById('formQty').value = 1;
+  document.getElementById('formBuyPrice').value = livePrice.toFixed(2);
+  document.getElementById('formTarget').value = (livePrice * 1.08).toFixed(2);
+  document.getElementById('formStopLoss').value = Math.max(stock.dma50, livePrice * 0.95).toFixed(2);
+  document.getElementById('formNotes').value = ai ? `TV AI: ${ai.bias}. ${ai.reasons.slice(0,3).join(' | ')}` : 'Auto-filled from screener candidate.';
+  activateTab('holdings');
+}
+
+    function saveHolding() {
+      const symbol = document.getElementById('formSymbol').value;
+      const stock = getStock(symbol);
+      const qty = Number(document.getElementById('formQty').value);
+      const buyPrice = Number(document.getElementById('formBuyPrice').value);
+      const target = Number(document.getElementById('formTarget').value || 0);
+      const stopLoss = Number(document.getElementById('formStopLoss').value || 0);
+      const notes = document.getElementById('formNotes').value.trim();
+      if (!symbol || !qty || !buyPrice) { alert('Please select a stock, quantity, and buy price.'); return; }
+      const existing = virtualHoldings.findIndex(h => h.symbol === symbol);
+      const payload = { symbol, company: stock?.company || '', qty, buyPrice, target, stopLoss, notes, addedAt: new Date().toISOString() };
+      if (existing >= 0) virtualHoldings[existing] = payload; else virtualHoldings.push(payload);
+      redraw();
+      activateTab('holdings');
+    }
+    function editHolding(index) {
+      const h = virtualHoldings[index]; if (!h) return;
+      document.getElementById('formSymbol').value = h.symbol;
+      document.getElementById('formQty').value = h.qty;
+      document.getElementById('formBuyPrice').value = h.buyPrice;
+      document.getElementById('formTarget').value = h.target || '';
+      document.getElementById('formStopLoss').value = h.stopLoss || '';
+      document.getElementById('formNotes').value = h.notes || '';
+      activateTab('holdings');
+    }
+    function removeHolding(index) { virtualHoldings.splice(index, 1); redraw(); }
+    function exportJson(filename, data) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
+    }
+    function importJsonFile(file, callback) {
+      const reader = new FileReader();
+      reader.onload = () => { try { callback(JSON.parse(reader.result)); } catch { alert('Invalid JSON file.'); } };
+      reader.readAsText(file);
+    }
+    function selectAiSymbol(symbol) { selectedTvSymbol = symbol; activateTab('tvai'); renderTvPreview(); renderAiReasons(); }
+
+    document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => activateTab(tab.dataset.tab)));
+    document.getElementById('searchInput').addEventListener('input', renderDashboard);
+    document.getElementById('sortBy').addEventListener('change', renderDashboard);
+    document.getElementById('tvChatInput').value = tvChatText;
+    document.getElementById('tvChatInput').addEventListener('input', redraw);
+    document.getElementById('btnParseTvChat').addEventListener('click', redraw);
+    document.getElementById('btnLoadDemoTvChat').addEventListener('click', () => { document.getElementById('tvChatInput').value = demoTvChat.trim(); redraw(); });
+    document.getElementById('btnClearTvChat').addEventListener('click', () => { document.getElementById('tvChatInput').value = ''; selectedTvSymbol = null; redraw(); });
+    document.getElementById('btnGoTvAi').addEventListener('click', () => activateTab('tvai'));
+    document.getElementById('btnOpenTradingView').addEventListener('click', () => {
+      if (!selectedTvSymbol) return alert('Select an AI live pick first.');
+      window.open(`https://www.tradingview.com/chart/?symbol=NSE%3A${encodeURIComponent(selectedTvSymbol)}`, '_blank', 'noopener');
+    });
+    document.getElementById('btnSaveHolding').addEventListener('click', saveHolding);
+    document.getElementById('btnPrefillAiPick').addEventListener('click', () => {
+      const top = getAiRankings().find(x => x.candidateAndPositive); if (!top) return alert('No AI live pick available yet.'); quickAdd(top.stock.symbol);
+    });
+    document.getElementById('btnExportHoldings').addEventListener('click', () => exportJson('virtual-holdings.json', virtualHoldings));
+    document.getElementById('btnExportUniverse').addEventListener('click', () => exportJson('swing-stock-universe.json', stockUniverse));
+    document.getElementById('btnResetHoldings').addEventListener('click', () => { if (confirm('Clear all virtual holdings?')) { virtualHoldings = []; redraw(); } });
+    document.getElementById('btnLoadDemo').addEventListener('click', () => { stockUniverse = structuredClone(demoUniverse); redraw(); if (liveSocket && liveSocket.readyState === WebSocket.OPEN) liveSocket.send(JSON.stringify({ type: 'subscribe', symbols: broadcastSymbolsPayload() })); });
+    document.getElementById('universeFile').addEventListener('change', e => {
+      const file = e.target.files?.[0]; if (!file) return;
+      importJsonFile(file, parsed => { if (!Array.isArray(parsed)) return alert('Universe JSON should be an array of stock objects.'); stockUniverse = parsed; redraw(); if (liveSocket && liveSocket.readyState === WebSocket.OPEN) liveSocket.send(JSON.stringify({ type: 'subscribe', symbols: broadcastSymbolsPayload() })); });
+    });
+    document.getElementById('holdingsFile').addEventListener('change', e => {
+      const file = e.target.files?.[0]; if (!file) return;
+      importJsonFile(file, parsed => { if (!Array.isArray(parsed)) return alert('Holdings JSON should be an array.'); virtualHoldings = parsed; redraw(); });
+    });
+
+    redraw();
+
+    window.quickAdd = quickAdd;
+    window.editHolding = editHolding;
+    window.removeHolding = removeHolding;
+    window.selectAiSymbol = selectAiSymbol;
+    window.addEventListener('beforeunload', () => { liveSocketManualClose = true; if (liveSocket) liveSocket.close(); });
+  </script>
+</body>
+</html>
