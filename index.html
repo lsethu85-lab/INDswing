@@ -1,0 +1,3040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NSE Institutional Swing Engine v3.0</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.383.0/umd/lucide.min.js"></script>
+    <script>
+        // Safe wrapper — prevents "lucide is not defined" if CDN is slow or blocked
+        function safeCreateIcons() {
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
+            }
+        }
+
+        // Inline SVG icons for use inside innerHTML (dynamic rows) — no lucide dependency needed
+        const SVG = {
+            eye:        `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`,
+            plus:       `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+            barChart:   `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+            trash:      `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`,
+            trendingUp: `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
+            wifi:       `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>`,
+        };
+    </script>
+    <style>
+        body {
+            background-color: #0b0f19;
+            color: #f3f4f6;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+    
+        .chart-grid line { stroke: rgba(148,163,184,0.12); stroke-width: 1; }
+        .equity-grid line { stroke: rgba(148,163,184,0.12); stroke-width: 1; }
+        .glass-panel {
+            background: linear-gradient(180deg, rgba(17,24,39,0.72) 0%, rgba(3,7,18,0.86) 100%);
+            border: 1px solid rgba(55,65,81,0.85);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.28);
+        }
+        .mini-stat {
+            background: linear-gradient(180deg, rgba(17,24,39,0.92) 0%, rgba(3,7,18,0.95) 100%);
+            border: 1px solid rgba(55,65,81,0.9);
+        }
+
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <header class="border-b border-gray-800 bg-gray-900/50 backdrop-blur px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
+        <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 p-2 rounded-lg text-white">
+                <i data-lucide="trending-up" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                    NSE Quant <span class="text-xs px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">Swing Engine v3.0 · Institutional</span>
+                </h1>
+                <p class="text-xs text-gray-400">Automated Nifty Multilayer Confirmation Scanner</p>
+                <p class="text-[11px] text-indigo-300/80">Powered by Sethu</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="text-right">
+                <p class="text-xs text-gray-400">Data Freshness</p>
+                <p id="timestamp" class="text-xs font-mono text-gray-200">Not Scanned Yet</p>
+            </div>
+            <button id="scanBtn" onclick="runGlobalScan()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm px-4 py-2 rounded-lg transition dynamic-flex items-center gap-2 shadow-lg shadow-indigo-600/20 cursor-pointer">
+                <i data-lucide="refresh-cw" class="w-4 h-4 inline mr-1" id="refreshIcon"></i> Scan Universe
+            </button>
+        </div>
+    </header>
+
+    <div id="progressContainer" class="w-full bg-gray-900 h-1.5 hidden relative">
+        <div id="progressBar" class="bg-gradient-to-r from-indigo-500 to-emerald-500 h-1.5 w-0 transition-all duration-300"></div>
+    </div>
+
+    <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 md:p-6 grid grid-cols-1 gap-6">
+        
+        <div class="border-b border-gray-800 flex flex-wrap gap-2">
+            <button onclick="switchTab('masterswings')" id="tab-masterswings" class="px-5 py-3 text-sm font-medium border-b-2 border-indigo-500 text-indigo-400 flex items-center gap-2 transition-all cursor-pointer">
+                <i data-lucide="crown" class="w-4 h-4"></i> Master Swings
+            </button>
+
+            <button onclick="switchTab('cards')" id="tab-cards" class="px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200 flex items-center gap-2 transition-all cursor-pointer">
+                <i data-lucide="flame" class="w-4 h-4"></i> My Picks
+            </button>
+            <button onclick="switchTab('virtual')" id="tab-virtual" class="px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200 flex items-center gap-2 transition-all cursor-pointer">
+                <i data-lucide="flask-conical" class="w-4 h-4"></i> Sandbox Trading
+            </button>
+        </div>
+
+                <section id="content-masterswings" class="tab-panel space-y-4">
+            <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-5">
+                <h2 class="text-xl font-bold text-emerald-400">Master Swing Trader</h2>
+                <p class="text-gray-400 mt-2">
+                    Institutional-grade swing trading framework inspired by Mark Minervini,
+                    Prasenjit Paul, Trading in the Zone, and Market Wizards.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-5">
+                    <div class="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                        <div class="text-xs text-gray-400">Master Candidates</div>
+                        <div id="msCandidates" class="text-2xl font-bold text-white">0</div>
+                    </div>
+                    <div class="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                        <div class="text-xs text-gray-400">A+ Setups</div>
+                        <div id="msAPlus" class="text-2xl font-bold text-emerald-400">0</div>
+                    </div>
+                    <div class="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                        <div class="text-xs text-gray-400">Breakout Ready</div>
+                        <div id="msBreakout" class="text-2xl font-bold text-indigo-400">0</div>
+                    </div>
+                    <div class="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                        <div class="text-xs text-gray-400">High Momentum</div>
+                        <div id="msMomentum" class="text-2xl font-bold text-amber-400">0</div>
+                    </div>
+                </div>
+
+                <!-- Master Swings Filter Bar -->
+                <div class="mt-6 flex flex-wrap gap-3 items-center justify-between bg-gray-950/60 border border-gray-800 rounded-xl p-4">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <input type="text" id="msSearchStock" oninput="filterMasterSwings()" placeholder="Search ticker or pattern..." class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-sm w-60 focus:outline-none focus:border-emerald-500 text-gray-200">
+                        <select id="msFilterAction" onchange="filterMasterSwings()" class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-emerald-500 text-gray-200">
+                            <option value="ALL">All Actions</option>
+                            <option value="Strong Buy">Strong Buy</option>
+                            <option value="Buy">Buy</option>
+                            <option value="Watch">Watch</option>
+                            <option value="Avoid">Avoid</option>
+                        </select>
+                        <select id="msFilterSetup" onchange="filterMasterSwings()" class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-emerald-500 text-gray-200">
+                            <option value="ALL">All Setups</option>
+                            <option value="A+">A+ Setup</option>
+                            <option value="Breakout">Breakout Ready</option>
+                            <option value="Momentum">High Momentum</option>
+                        </select>
+                    </div>
+                    <div class="text-xs text-gray-400">
+                        Showing <span id="msVisibleCount" class="text-emerald-400 font-bold">0</span> of <span id="msTotalCount" class="text-gray-300">0</span> candidates
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto mt-4 custom-scrollbar">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-800 bg-gray-900/60 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                <th class="p-3 text-left">Stock</th>
+                                <th class="p-3 text-left">Master Score</th>
+                                <th class="p-3 text-left">Trend</th>
+                                <th class="p-3 text-left">Momentum</th>
+                                <th class="p-3 text-left">Psychology</th>
+                                <th class="p-3 text-left">MTF</th>
+                                <th class="p-3 text-left">Action</th>
+                                <th class="p-3 text-right">Operations</th>
+                            </tr>
+                        </thead>
+                        <tbody id="masterSwingsTableBody">
+                            <tr>
+                                <td colspan="8" class="p-6 text-center text-gray-500">
+                                    Run Scan Universe to generate Master Swing candidates.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ── Deep-Dive Analytics (merged inline) ─────────────────── -->
+            <div id="ms-analytics-panel" class="hidden bg-gray-900/40 border border-indigo-700/40 rounded-xl p-5 space-y-5 mt-2">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                    <h3 class="text-sm font-bold text-indigo-300 flex items-center gap-2">
+                        <i data-lucide="line-chart" class="w-4 h-4"></i> Deep-Dive Analytics —
+                        <span id="chartTickerLabel" class="text-white font-mono">—</span>
+                    </h3>
+                    <button onclick="document.getElementById('ms-analytics-panel').classList.add('hidden')"
+                        class="text-gray-400 hover:text-white text-xs px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg transition cursor-pointer flex items-center gap-1">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i> Close
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    <!-- Score panel -->
+                    <div class="bg-gray-950 border border-gray-800 rounded-xl p-5 space-y-4 text-center">
+                        <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider text-left">Quantitative Health Profile</h4>
+                        <div class="relative inline-flex items-center justify-center p-6">
+                            <span id="analyticsBigScore" class="text-5xl font-black tracking-tight text-white">--</span>
+                            <span class="text-xs text-gray-500 absolute bottom-2">Swing Score</span>
+                        </div>
+                        <div id="analyticsBadge" class="py-2 px-4 rounded-xl text-sm font-bold tracking-wide max-w-[200px] mx-auto bg-gray-800 text-gray-400">PENDING SCAN</div>
+                        <hr class="border-gray-800">
+                        <div class="text-left space-y-2 text-xs">
+                            <div class="flex justify-between"><span class="text-gray-400">Mathematical Setup:</span><span id="analyticsSetupCount" class="font-mono text-gray-200">--</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">ATR Volatility:</span><span id="analyticsAtrValue" class="font-mono text-gray-200">--</span></div>
+                        </div>
+                        <!-- Signal breakdown -->
+                        <div class="mt-4 space-y-2">
+                            <h5 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider text-left">Multi-Layer Signal Breakdown</h5>
+                            <div id="analyticsExplainerGrid" class="space-y-1.5 text-left"></div>
+                        </div>
+                    </div>
+                    <!-- Chart panel -->
+                    <div class="lg:col-span-2 bg-gray-950 border border-gray-800 rounded-xl p-4 h-[440px] flex flex-col">
+                        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                            <i data-lucide="activity" class="w-4 h-4 text-indigo-400"></i> Institutional Execution View
+                        </p>
+                        <div class="flex-1 bg-[#020617] border border-gray-800/80 rounded-lg overflow-hidden relative" id="chartTargetFrame">
+                            <div class="absolute inset-0 flex flex-col items-center justify-center text-gray-500 text-sm">
+                                <i data-lucide="bar-chart-2" class="w-10 h-10 mb-2 opacity-30 animate-pulse"></i>
+                                Click a stock row to load its chart
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <section id="content-cards" class="tab-panel space-y-5 hidden">
+            <!-- My Swing Header -->
+            <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-5">
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-5">
+                    <div>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i data-lucide="flame" class="w-5 h-5 text-orange-400"></i> My Picks — Institutional NSE Tracker
+                        </h2>
+                        <p class="text-xs text-gray-400 mt-0.5">Add NSE/BSE stocks. Real 1-year OHLCV fetched from Yahoo Finance — indicators, ATR targets & patterns calculated on actual price data.</p>
+                    </div>
+                    <!-- Summary Cards -->
+                    <div class="flex flex-wrap gap-3">
+                        <div class="bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-center min-w-[90px]">
+                            <p class="text-[10px] text-gray-500 uppercase tracking-wider">Invested</p>
+                            <p id="mswing-invested" class="text-base font-bold font-mono text-white">₹0</p>
+                        </div>
+                        <div class="bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-center min-w-[90px]">
+                            <p class="text-[10px] text-gray-500 uppercase tracking-wider">Current</p>
+                            <p id="mswing-current" class="text-base font-bold font-mono text-white">₹0</p>
+                        </div>
+                        <div class="bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-center min-w-[90px]">
+                            <p class="text-[10px] text-gray-500 uppercase tracking-wider">Total P&L</p>
+                            <p id="mswing-pnl" class="text-base font-bold font-mono text-gray-400">₹0</p>
+                        </div>
+                        <div class="bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-center min-w-[90px]">
+                            <p class="text-[10px] text-gray-500 uppercase tracking-wider">Positions</p>
+                            <p id="mswing-count" class="text-base font-bold font-mono text-indigo-400">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="flex flex-wrap gap-3 items-center">
+                    <div class="flex-1 min-w-[220px] relative">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"></i>
+                        <input type="text" id="myswing-search" placeholder="Search NSE ticker (e.g. RELIANCE, TATAMOTORS)…"
+                            class="w-full bg-gray-950 border border-gray-700 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 placeholder-gray-600"
+                            oninput="mySwingFilterSearch(this.value)" autocomplete="off" />
+                        <!-- Dropdown suggestions -->
+                        <div id="myswing-dropdown" class="absolute left-0 right-0 top-full mt-1 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 hidden max-h-60 overflow-y-auto custom-scrollbar"></div>
+                    </div>
+                    <button onclick="mySwingAddStock()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm px-4 py-2 rounded-lg transition flex items-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/20">
+                        <i data-lucide="plus" class="w-4 h-4"></i> Add Stock
+                    </button>
+                    <button onclick="mySwingRefreshPrices()" id="myswing-refresh-btn" class="bg-sky-700 hover:bg-sky-600 text-white font-semibold text-sm px-4 py-2 rounded-lg transition flex items-center gap-2 cursor-pointer">
+                        <i data-lucide="wifi" class="w-4 h-4"></i> Refresh Prices
+                    </button>
+                    <button onclick="mySwingExport()" class="bg-indigo-700 hover:bg-indigo-600 text-white font-semibold text-sm px-4 py-2 rounded-lg transition flex items-center gap-2 cursor-pointer" title="Export holdings & history as JSON">
+                        <i data-lucide="save" class="w-4 h-4"></i> Save
+                    </button>
+                    <label class="bg-gray-700 hover:bg-gray-600 text-white font-semibold text-sm px-4 py-2 rounded-lg transition flex items-center gap-2 cursor-pointer" title="Import from JSON file">
+                        <i data-lucide="folder-open" class="w-4 h-4"></i> Load
+                        <input type="file" id="myswing-import-file" accept=".json" hidden onchange="mySwingImport(event)">
+                    </label>
+                    <div id="myswing-status" class="hidden items-center gap-2 text-[11px] font-mono bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5">
+                        <span id="myswing-status-dot" class="w-1.5 h-1.5 rounded-full bg-gray-500 inline-block flex-shrink-0 animate-pulse"></span>
+                        <span id="myswing-status-text" class="text-gray-400">—</span>
+                    </div>
+                </div>
+            </div>
+
+            
+            <!-- Institutional P&L Dashboard -->
+            <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-5 space-y-4">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4 text-indigo-400"></i> Professional P&L Dashboard
+                    </h3>
+                    <span class="text-[10px] text-gray-500 font-mono">Updated live with every price refresh</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Unrealized -->
+                    <div class="bg-gray-950 border border-gray-800 rounded-lg p-4 space-y-2">
+                        <p class="text-[10px] text-amber-300 uppercase tracking-wider font-bold">Unrealized</p>
+                        <div class="flex justify-between text-xs"><span class="text-gray-400">Profit</span><span id="pnl-u-profit" class="font-mono font-bold text-emerald-400">₹0</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-gray-400">Loss</span><span id="pnl-u-loss" class="font-mono font-bold text-red-400">₹0</span></div>
+                        <div class="flex justify-between text-sm pt-1 border-t border-gray-800"><span class="text-gray-300 font-semibold">Net</span><span id="pnl-u-net" class="font-mono font-bold text-white">₹0</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-gray-400">Return %</span><span id="pnl-u-pct" class="font-mono text-gray-300">0.00%</span></div>
+                    </div>
+                    <!-- Realized -->
+                    <div class="bg-gray-950 border border-gray-800 rounded-lg p-4 space-y-2">
+                        <p class="text-[10px] text-sky-300 uppercase tracking-wider font-bold">Realized</p>
+                        <div class="flex justify-between text-xs"><span class="text-gray-400">Profit</span><span id="pnl-r-profit" class="font-mono font-bold text-emerald-400">₹0</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-gray-400">Loss</span><span id="pnl-r-loss" class="font-mono font-bold text-red-400">₹0</span></div>
+                        <div class="flex justify-between text-sm pt-1 border-t border-gray-800"><span class="text-gray-300 font-semibold">Net</span><span id="pnl-r-net" class="font-mono font-bold text-white">₹0</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-gray-400">Trades</span><span id="pnl-r-trades" class="font-mono text-gray-300">0</span></div>
+                    </div>
+                    <!-- Combined -->
+                    <div class="bg-gray-950 border border-indigo-700/50 rounded-lg p-4 space-y-2">
+                        <p class="text-[10px] text-indigo-300 uppercase tracking-wider font-bold">Combined</p>
+                        <div class="flex justify-between text-xs"><span class="text-gray-400">Total P&L</span><span id="pnl-c-total" class="font-mono font-bold text-white">₹0</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-gray-400">Portfolio Return</span><span id="pnl-c-pct" class="font-mono font-bold text-white">0.00%</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-gray-400">Win Rate</span><span id="pnl-c-win" class="font-mono text-emerald-300">0%</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-gray-400">Avg Gain</span><span id="pnl-c-avgg" class="font-mono text-emerald-300">₹0</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-gray-400">Avg Loss</span><span id="pnl-c-avgl" class="font-mono text-red-300">₹0</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Holdings Table -->
+            <div class="bg-gray-900/20 border border-gray-800 rounded-xl overflow-hidden shadow-xl">
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-gray-900/80 border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                <th class="p-4">Stock</th>
+                                <th class="p-4">Avg Price</th>
+                                <th class="p-4">Qty</th>
+                                <th class="p-4">LTP</th>
+                                <th class="p-4">Pattern / Signal</th>
+                                <th class="p-4 text-red-400">Stop Loss</th>
+                                <th class="p-4 text-emerald-400">T1</th>
+                                <th class="p-4 text-emerald-400">T2</th>
+                                <th class="p-4 text-blue-400">T3</th>
+                                <th class="p-4">P&L</th>
+                                <th class="p-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="myswing-table-body">
+                            <tr id="myswing-empty-row">
+                                <td colspan="11" class="text-center py-14 text-gray-500">
+                                    <i data-lucide="flame" class="w-9 h-9 mx-auto mb-3 opacity-30"></i>
+                                    <p class="font-medium">No picks yet.</p>
+                                    <p class="text-xs mt-1 text-gray-600">Search and add an Indian stock above to start tracking.</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Sell History Log -->
+            <div id="myswing-history-section" class="hidden bg-gray-900/20 border border-gray-800 rounded-xl overflow-hidden shadow-xl">
+                <div class="p-4 border-b border-gray-800 flex items-center justify-between">
+                    <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                        <i data-lucide="history" class="w-4 h-4 text-indigo-400"></i> Sell History
+                    </h3>
+                    <button onclick="mySwingClearHistory()" class="text-xs text-red-400 hover:text-red-300 transition cursor-pointer">Clear All</button>
+                </div>
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-gray-900/60 border-b border-gray-800 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                <th class="p-3">Stock</th>
+                                <th class="p-3">Avg Price</th>
+                                <th class="p-3">Qty</th>
+                                <th class="p-3">Sell Price</th>
+                                <th class="p-3">Realized P&L</th>
+                                <th class="p-3">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="myswing-history-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Deep-Dive Analytics merged into Master Swings inline panel below -->
+
+        <section id="content-virtual" class="tab-panel hidden space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase font-semibold">Total Allocated Capital</p>
+                        <h4 id="vTotalCapital" class="text-2xl font-bold font-mono tracking-tight text-white mt-1">₹0.00</h4>
+                    </div>
+                    <div class="bg-gray-800 p-3 rounded-lg text-gray-400"><i data-lucide="wallet" class="w-5 h-5"></i></div>
+                </div>
+                <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase font-semibold">Current Portfolio Value</p>
+                        <h4 id="vCurrentValue" class="text-2xl font-bold font-mono tracking-tight text-white mt-1">₹0.00</h4>
+                    </div>
+                    <div class="bg-gray-800 p-3 rounded-lg text-gray-400"><i data-lucide="line-chart" class="w-5 h-5"></i></div>
+                </div>
+                <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase font-semibold">Net Unrealized P&L</p>
+                        <h4 id="vTotalPl" class="text-2xl font-bold font-mono tracking-tight text-gray-400 mt-1">₹0.00</h4>
+                    </div>
+                    <div id="vTotalPlBg" class="bg-gray-800 p-3 rounded-lg text-gray-400"><i data-lucide="percent" class="w-5 h-5"></i></div>
+                </div>
+                <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase font-semibold">Active Strategies</p>
+                        <h4 id="vActiveCount" class="text-2xl font-bold font-mono tracking-tight text-white mt-1">0 Positions</h4>
+                    </div>
+                    <div class="bg-gray-800 p-3 rounded-lg text-gray-400"><i data-lucide="check-square" class="w-5 h-5"></i></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div class="xl:col-span-2 glass-panel rounded-2xl p-5 space-y-4">
+                    <div class="flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-200 flex items-center gap-2">
+                                <i data-lucide="chart-candlestick" class="w-4 h-4 text-indigo-400"></i> Portfolio Analytics & Equity Curve
+                            </h3>
+                            <p class="text-xs text-gray-400 mt-1">Auto-saved locally + portable JSON export/import across browsers and computers.</p>
+                        </div>
+                        <div id="portfolioSyncState" class="text-[11px] px-2.5 py-1 rounded-lg border border-indigo-500/20 bg-indigo-500/10 text-indigo-300">Local Auto-Save Enabled</div>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div class="mini-stat rounded-xl p-3">
+                            <p class="text-[11px] uppercase tracking-wider text-gray-400">Open Exposure</p>
+                            <p id="vExposure" class="mt-1 text-xl font-bold font-mono text-white">₹0.00</p>
+                        </div>
+                        <div class="mini-stat rounded-xl p-3">
+                            <p class="text-[11px] uppercase tracking-wider text-gray-400">Avg R:R</p>
+                            <p id="vAvgRR" class="mt-1 text-xl font-bold font-mono text-emerald-400">0.00</p>
+                        </div>
+                        <div class="mini-stat rounded-xl p-3">
+                            <p class="text-[11px] uppercase tracking-wider text-gray-400">Best Position</p>
+                            <p id="vBestPos" class="mt-1 text-sm font-bold text-white">--</p>
+                        </div>
+                        <div class="mini-stat rounded-xl p-3">
+                            <p class="text-[11px] uppercase tracking-wider text-gray-400">Worst Position</p>
+                            <p id="vWorstPos" class="mt-1 text-sm font-bold text-white">--</p>
+                        </div>
+                    </div>
+                    <div class="bg-gray-950/90 border border-gray-800 rounded-xl p-3">
+                        <div class="flex justify-between items-center gap-3 mb-3">
+                            <div>
+                                <p class="text-xs font-semibold text-gray-300">Virtual Equity Curve</p>
+                                <p class="text-[11px] text-gray-500">Snapshots are captured when portfolio changes or when scans refresh prices.</p>
+                            </div>
+                            <div id="vSnapshotCount" class="text-[11px] text-gray-400 font-mono">0 snapshots</div>
+                        </div>
+                        <svg id="equityCurveChart" viewBox="0 0 860 260" class="w-full h-[260px] rounded-lg bg-gray-950"></svg>
+                    </div>
+                </div>
+                <div class="glass-panel rounded-2xl p-5 space-y-4">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-200 flex items-center gap-2">
+                            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i> Risk Command Center
+                        </h3>
+                        <p class="text-xs text-gray-400 mt-1">Execution health based on current allocations and stop/target map.</p>
+                    </div>
+                    <div id="riskCommandGrid" class="space-y-3">
+                        <div class="mini-stat rounded-xl p-3 flex items-center justify-between">
+                            <span class="text-sm text-gray-400">No open positions yet.</span>
+                            <span class="text-xs text-gray-500">Awaiting data</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-900/20 border border-gray-800 rounded-xl overflow-hidden shadow-xl">
+                <div class="p-4 bg-gray-900/60 border-b border-gray-800 flex flex-wrap items-center justify-between gap-4">
+                    <h3 class="text-sm font-semibold text-gray-200 flex items-center gap-2">
+                        <i data-lucide="shield-alert" class="w-4 h-4 text-emerald-400"></i> Active Virtual Execution Ledger
+                    </h3>
+                    <div class="flex gap-2 flex-wrap">
+                        <button onclick="fetchLiveNSEPrices(true)" id="livePriceBtn" class="bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer">
+                            <i data-lucide="wifi" class="w-3.5 h-3.5"></i> Refresh Prices
+                        </button>
+                        <div id="livePriceStatusBar" class="hidden items-center gap-2 text-[11px] font-mono bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5">
+                            <span id="livePriceStatusDot" class="w-1.5 h-1.5 rounded-full bg-gray-500 inline-block flex-shrink-0"></span>
+                            <span id="livePriceStatus" class="text-gray-400">—</span>
+                            <span id="liveCountdown" class="text-gray-600 hidden">&nbsp;· next in <span id="liveCountdownSec" class="text-sky-400 font-bold">5:00</span></span>
+                        </div>
+                        <button onclick="openManualTradeModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Custom Position
+                        </button>
+                        <button onclick="exportPortfolio()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer">
+                            <i data-lucide="save" class="w-3.5 h-3.5"></i> Save
+                        </button>
+                        <label class="bg-gray-700 hover:bg-gray-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1">
+                            <i data-lucide="folder-open" class="w-3.5 h-3.5"></i> Load
+                            <input type="file" id="importFile" accept=".json" hidden onchange="importPortfolio(event)">
+                        </label>
+                        <button onclick="resetPortfolio()" class="bg-red-700/80 hover:bg-red-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Reset
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-900/40 border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                                <th class="p-4">Asset</th>
+                                <th class="p-4">Position Details</th>
+                                <th class="p-4">Calculated Risk Rules (SL)</th>
+                                <th class="p-4">Target Matrix (T1 / T2)</th>
+                                <th class="p-4">Live Track Status <span id="liveBadgeHeader" class="hidden ml-1 text-[9px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30 font-bold">LIVE</span></th>
+                                <th class="p-4 font-mono">Unrealized P&L</th>
+                                <th class="p-4 text-right">Execution Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="virtualTableBody" class="divide-y divide-gray-800/60 text-sm">
+                            <tr>
+                                <td colspan="7" class="text-center py-12 text-gray-500">
+                                    <i data-lucide="info" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+                                    Sandbox ledger empty. Add a position from My Picks or commit a custom overlay below.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Partial Sell Modal -->
+    <div id="partialSellModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-gray-900 border border-gray-800 rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
+            <div class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950">
+                <h3 class="text-base font-bold text-white">Sell Position — <span id="psTicker" class="text-amber-400"></span></h3>
+                <button onclick="closePartialSellModal()" class="text-gray-400 hover:text-white cursor-pointer">✕</button>
+            </div>
+            <div class="p-5 space-y-4 text-sm text-gray-300">
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div class="bg-gray-950 border border-gray-800 rounded p-2"><span class="text-gray-500">Avg Price</span><div id="psAvg" class="text-white font-mono font-bold">--</div></div>
+                    <div class="bg-gray-950 border border-gray-800 rounded p-2"><span class="text-gray-500">LTP</span><div id="psLtp" class="text-white font-mono font-bold">--</div></div>
+                    <div class="bg-gray-950 border border-gray-800 rounded p-2"><span class="text-gray-500">Total Qty</span><div id="psQty" class="text-white font-mono font-bold">--</div></div>
+                    <div class="bg-gray-950 border border-gray-800 rounded p-2"><span class="text-gray-500">Unrealized P&L</span><div id="psPnl" class="font-mono font-bold">--</div></div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1">Quantity to Sell</label>
+                    <input type="number" id="psSellQty" min="1" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-amber-500" />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1">Sell Price (₹)</label>
+                    <input type="number" step="0.01" id="psSellPrice" class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-amber-500" />
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button onclick="confirmPartialSell()" class="flex-1 bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-lg transition cursor-pointer">Confirm Sell</button>
+                    <button onclick="confirmFullSell()" class="flex-1 bg-red-700 hover:bg-red-600 text-white font-bold py-2.5 rounded-lg transition cursor-pointer">Sell ALL</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="manualTradeModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50" onclick="if(event.target===this)closeManualTradeModal()">
+        <div class="bg-gray-900 border border-gray-800 rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
+            <div class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-950">
+                <h3 class="text-base font-bold text-white flex items-center gap-2"><i data-lucide="plus-circle" class="text-indigo-400 w-5 h-5"></i> Add Position Envelope</h3>
+                <button type="button" onclick="closeManualTradeModal()" class="text-gray-400 hover:text-white cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="manualTradeForm" onsubmit="handleManualTradeSubmit(event)" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1">Asset Symbol (NSE Format)</label>
+                    <input type="text" id="mTicker" required placeholder="e.g. RELIANCE" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-indigo-500 uppercase">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 mb-1">Execution Entry Price (₹)</label>
+                        <input type="number" step="0.01" id="mPrice" required placeholder="1250.00" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 mb-1">Volume Allocation (Qty)</label>
+                        <input type="number" id="mQty" required placeholder="50" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono">
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 mb-1">Risk Buffer (SL)</label>
+                        <input type="number" step="0.01" id="mSl" required placeholder="1200" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-red-500 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 mb-1">Objective Target 1</label>
+                        <input type="number" step="0.01" id="mT1" required placeholder="1300" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 mb-1">Objective Target 2</label>
+                        <input type="number" step="0.01" id="mT2" required placeholder="1380" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono">
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-gradient-to-r from-indigo-600 to-emerald-600 text-white font-medium text-sm p-3 rounded-lg transition shadow-lg cursor-pointer">
+                    Commit to Virtual Environment
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. CORE UNIVERSE SPECIFICATION ---
+        const NIFTY_200_TICKERS = [
+            "RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "BHARTIARTL", "SBIN", "LICI", "ITC", "HINDUNILVR",
+            "LT", "BAJFINANCE", "HCLTECH", "MARUTI", "SUNPHARMA", "ADANIENT", "KOTAKBANK", "TITAN", "AXISBANK", "ONGC",
+            "NTPC", "TATAMOTORS", "ULTRACEMCO", "COALINDIA", "ASIANPAINT", "POWERGRID", "ADANIGREEN", "ADANIPORTS", "BAJAJFSV", "TATASTEEL",
+            "M&M", "INDUSINDBK", "JIOFIN", "HINDALCO", "JSWSTEEL", "DLF", "GRASIM", "TECHM", "SBILIFE", "BPCL",
+            "BAJAJ-AUTO", "CIPLA", "EICHERMOT", "WIPRO", "BRITANNIA", "NESTLEIND", "HAL", "BEL", "ADANIPOWER", "TATACONSUM",
+            "VBL", "ZOMATO", "CHOLAFIN", "GAIL", "DIVISLAB", "HINDZINC", "IOC", "GODREJPROP", "PRESTIGE", "TRENT",
+            "SIEMENS", "ABB", "PFC", "RECL", "PIDILITIND", "APOLLOHOSP", "SHRIRAMFIN", "HAVELLS", "HEROMOTOCO", "DRREDDY",
+            "LTIM", "PNB", "UNIONBANK", "CANBK", "BANKBARODA", "IDBI", "JSL", "GMRINFRA", "TATAELXSI", "MPHASIS"
+        ];
+
+        // --- 2. GLOBAL SYSTEM STATE DATA STORE ---
+        let globalScanDataset = {};
+        let activeVirtualPortfolio = [];
+        let portfolioHistory = [];
+        let currentActiveTab = "masterswings";
+        let activeSortField = "score";
+        let sortAscending = false;
+
+        // --- LIVE PRICE CACHE (Yahoo Finance / NSE) ---
+        let liveNSEPrices = {};       // { "RELIANCE": 2850.40, ... }
+        let liveNSELastFetched = null; // Date of last successful fetch
+
+        // --- REAL OHLCV CACHE (Yahoo Finance v8/chart 1-year daily data) ---
+        let realOHLCVCache = {};       // { "RELIANCE": [{date,open,high,low,close,volume}, ...] }
+        let ohlcvFetchInProgress = {}; // prevent duplicate concurrent fetches
+
+        // --- 3. THE MATHEMATICAL INDICATOR COMPILATION ENGINE ---
+        const QuantMathEngine = {
+            EMA: (data, window) => {
+                if(data.length < window) return Array(data.length).fill(0);
+                let k = 2 / (window + 1);
+                let emaArr = new Array(data.length);
+                let sum = 0;
+                for(let i=0; i<window; i++) sum += data[i];
+                emaArr[window - 1] = sum / window;
+                for(let i=0; i<window - 1; i++) emaArr[i] = 0;
+                for(let i=window; i<data.length; i++) {
+                    emaArr[i] = data[i] * k + emaArr[i-1] * (1 - k);
+                }
+                return emaArr;
+            },
+            RSI: (closePrices, window = 14) => {
+                if(closePrices.length <= window) return Array(closePrices.length).fill(50);
+                let rsi = new Array(closePrices.length).fill(0);
+                let gains = 0, losses = 0;
+                for(let i=1; i<=window; i++) {
+                    let diff = closePrices[i] - closePrices[i-1];
+                    if(diff > 0) gains += diff; else losses -= diff;
+                }
+                let avgGain = gains / window;
+                let avgLoss = losses / window;
+                rsi[window] = avgLoss === 0 ? 100 : 100 - (100 / (1 + (avgGain / avgLoss)));
+                for(let i = window + 1; i < closePrices.length; i++) {
+                    let diff = closePrices[i] - closePrices[i-1];
+                    avgGain = ((avgGain * (window - 1)) + (diff > 0 ? diff : 0)) / window;
+                    avgLoss = ((avgLoss * (window - 1)) + (diff < 0 ? -diff : 0)) / window;
+                    rsi[i] = avgLoss === 0 ? 100 : 100 - (100 / (1 + (avgGain / avgLoss)));
+                }
+                return rsi;
+            },
+            MACD: (closePrices, fast = 12, slow = 26, signalWindow = 9) => {
+                let emaFast = QuantMathEngine.EMA(closePrices, fast);
+                let emaSlow = QuantMathEngine.EMA(closePrices, slow);
+                let macdLine = new Array(closePrices.length).fill(0);
+                for(let i=0; i<closePrices.length; i++) {
+                    macdLine[i] = emaFast[i] - emaSlow[i];
+                }
+                let signalLine = QuantMathEngine.EMA(macdLine, signalWindow);
+                let histogram = new Array(closePrices.length).fill(0);
+                for(let i=0; i<closePrices.length; i++) {
+                    histogram[i] = macdLine[i] - signalLine[i];
+                }
+                return { macd: macdLine, signal: signalLine, hist: histogram };
+            },
+            ATR: (highs, lows, closes, window = 14) => {
+                if(highs.length <= window) return Array(highs.length).fill(0);
+                let tr = new Array(highs.length).fill(0);
+                tr[0] = highs[0] - lows[0];
+                for(let i=1; i<highs.length; i++) {
+                    let tr1 = highs[i] - lows[i];
+                    let tr2 = Math.abs(highs[i] - closes[i-1]);
+                    let tr3 = Math.abs(lows[i] - closes[i-1]);
+                    tr[i] = Math.max(tr1, tr2, tr3);
+                }
+                let atr = new Array(highs.length).fill(0);
+                let trSum = 0;
+                for(let i=0; i<window; i++) trSum += tr[i];
+                atr[window-1] = trSum / window;
+                for(let i=window; i<highs.length; i++) {
+                    atr[i] = (atr[i-1] * (window - 1) + tr[i]) / window;
+                }
+                return atr;
+            },
+            ADX: (highs, lows, closes, window = 14) => {
+                let len = highs.length;
+                let plusDI = new Array(len).fill(0);
+                let minusDI = new Array(len).fill(0);
+                let adx = new Array(len).fill(0);
+                if(len <= window) return { adx, plusDI, minusDI };
+                let tr = new Array(len).fill(0);
+                let plusDM = new Array(len).fill(0);
+                let minusDM = new Array(len).fill(0);
+                for(let i=1; i<len; i++) {
+                    let upMove = highs[i] - highs[i-1];
+                    let downMove = lows[i-1] - lows[i];
+                    if(upMove > downMove && upMove > 0) plusDM[i] = upMove;
+                    if(downMove > upMove && downMove > 0) minusDM[i] = downMove;
+                    let tr1 = highs[i] - lows[i];
+                    let tr2 = Math.abs(highs[i] - closes[i-1]);
+                    let tr3 = Math.abs(lows[i] - closes[i-1]);
+                    tr[i] = Math.max(tr1, tr2, tr3);
+                }
+                let smoothedTR = 0, smoothedPlusDM = 0, smoothedMinusDM = 0;
+                for(let i=1; i<=window; i++) {
+                    smoothedTR += tr[i];
+                    smoothedPlusDM += plusDM[i];
+                    smoothedMinusDM += minusDM[i];
+                }
+                plusDI[window] = (smoothedPlusDM / smoothedTR) * 100;
+                minusDI[window] = (smoothedMinusDM / smoothedTR) * 100;
+                let dx = new Array(len).fill(0);
+                dx[window] = Math.abs(plusDI[window] - minusDI[window]) / (plusDI[window] + minusDI[window] || 1) * 100;
+                for(let i=window+1; i<len; i++) {
+                    smoothedTR = smoothedTR - (smoothedTR / window) + tr[i];
+                    smoothedPlusDM = smoothedPlusDM - (smoothedPlusDM / window) + plusDM[i];
+                    smoothedMinusDM = smoothedMinusDM - (smoothedMinusDM / window) + minusDM[i];
+                    plusDI[i] = (smoothedPlusDM / smoothedTR) * 100;
+                    minusDI[i] = (smoothedMinusDM / smoothedTR) * 100;
+                    dx[i] = Math.abs(plusDI[i] - minusDI[i]) / (plusDI[i] + minusDI[i] || 1) * 100;
+                }
+                let dxSum = 0;
+                for(let i=window; i<window*2; i++) dxSum += dx[i];
+                adx[window*2 - 1] = dxSum / window;
+                for(let i=window*2; i<len; i++) {
+                    adx[i] = (adx[i-1] * (window-1) + dx[i]) / window;
+                }
+                return { adx, plusDI, minusDI };
+            }
+        };
+
+        
+        // ============================================================
+        // === INSTITUTIONAL MASTER ENGINE (v3.0) =====================
+        // === Indicators · Patterns · Fibonacci · S/R · Fundamentals ·
+        // === Value / Swing / Balanced Classification ================
+        // ============================================================
+        const MasterEngine = (() => {
+            // -- helpers --------------------------------------------------
+            const last  = a => a[a.length - 1];
+            const slice = (a, n) => a.slice(Math.max(0, a.length - n));
+            const SMA   = (arr, w) => {
+                if (arr.length < w) return Array(arr.length).fill(0);
+                const out = Array(arr.length).fill(0);
+                let s = 0;
+                for (let i = 0; i < w; i++) s += arr[i];
+                out[w - 1] = s / w;
+                for (let i = w; i < arr.length; i++) { s += arr[i] - arr[i - w]; out[i] = s / w; }
+                return out;
+            };
+            const stdev = (arr, w) => {
+                const m = arr.reduce((a,b)=>a+b,0)/arr.length;
+                return Math.sqrt(arr.reduce((a,b)=>a+(b-m)**2,0)/arr.length);
+            };
+
+            // -- core indicator bundle (uses existing QuantMathEngine) ----
+            function indicators(ohlcv) {
+                const closes  = ohlcv.map(d => d.close);
+                const highs   = ohlcv.map(d => d.high);
+                const lows    = ohlcv.map(d => d.low);
+                const volumes = ohlcv.map(d => d.volume);
+                const n = closes.length - 1;
+                const price = closes[n];
+
+                // Trend
+                const ema20  = QuantMathEngine.EMA(closes, 20);
+                const ema50  = QuantMathEngine.EMA(closes, 50);
+                const ema100 = QuantMathEngine.EMA(closes, 100);
+                const ema200 = QuantMathEngine.EMA(closes, 200);
+                const sma50  = SMA(closes, 50);
+                const sma200 = SMA(closes, 200);
+                const goldenCross = sma50[n] > sma200[n] && sma50[n - 5] <= sma200[n - 5];
+                const deathCross  = sma50[n] < sma200[n] && sma50[n - 5] >= sma200[n - 5];
+                const maAligned   = price > ema20[n] && ema20[n] > ema50[n] && ema50[n] > ema100[n] && ema100[n] > ema200[n];
+
+                // Momentum
+                const rsi  = QuantMathEngine.RSI(closes, 14);
+                const macd = QuantMathEngine.MACD(closes);
+                // Stochastic RSI (14)
+                const rsiSlice = slice(rsi, 14).filter(v => v > 0);
+                const rsiMin = Math.min(...rsiSlice), rsiMax = Math.max(...rsiSlice);
+                const stochRSI = rsiMax === rsiMin ? 50 : ((rsi[n] - rsiMin) / (rsiMax - rsiMin)) * 100;
+                // 10-bar momentum
+                const momentum = closes.length > 10 ? ((price - closes[n - 10]) / closes[n - 10]) * 100 : 0;
+                // MACD histogram expansion
+                const histExpand = macd.hist[n] > macd.hist[n - 1] && macd.hist[n - 1] > macd.hist[n - 2];
+                // RSI divergence (simple): price higher-high, RSI lower-high in last 20 bars
+                let rsiDivergence = 'none', hiddenRsiDivergence = 'none';
+                if (closes.length > 25) {
+                    const win = 20;
+                    const pHi  = Math.max(...closes.slice(n - win, n + 1));
+                    const pHi2 = Math.max(...closes.slice(n - 2 * win, n - win));
+                    const rHi  = Math.max(...rsi.slice(n - win, n + 1));
+                    const rHi2 = Math.max(...rsi.slice(n - 2 * win, n - win));
+                    if (pHi > pHi2 && rHi < rHi2) rsiDivergence = 'bearish';
+                    if (pHi < pHi2 && rHi > rHi2) rsiDivergence = 'bullish';
+                    // Hidden divergences
+                    const pLo  = Math.min(...closes.slice(n - win, n + 1));
+                    const pLo2 = Math.min(...closes.slice(n - 2 * win, n - win));
+                    const rLo  = Math.min(...rsi.slice(n - win, n + 1));
+                    const rLo2 = Math.min(...rsi.slice(n - 2 * win, n - win));
+                    if (pLo > pLo2 && rLo < rLo2) hiddenRsiDivergence = 'bullish';
+                    if (pHi < pHi2 && rHi > rHi2) hiddenRsiDivergence = 'bearish';
+                }
+
+                // Volume
+                const avgVol20 = volumes.slice(n - 20, n).reduce((a, b) => a + b, 0) / 20 || 1;
+                const relVolume = volumes[n] / avgVol20;
+                const volumeBreakout = relVolume > 1.8 && closes[n] > closes[n - 1];
+                // OBV
+                const obv = new Array(closes.length).fill(0);
+                for (let i = 1; i < closes.length; i++) {
+                    obv[i] = obv[i - 1] + (closes[i] > closes[i - 1] ? volumes[i] : closes[i] < closes[i - 1] ? -volumes[i] : 0);
+                }
+                const obvSlope = obv[n] - obv[n - 20];
+                // Chaikin Money Flow (20)
+                let cmfNum = 0, cmfDen = 0;
+                for (let i = n - 19; i <= n; i++) {
+                    const mfMult = ((closes[i] - lows[i]) - (highs[i] - closes[i])) / ((highs[i] - lows[i]) || 1);
+                    cmfNum += mfMult * volumes[i];
+                    cmfDen += volumes[i];
+                }
+                const cmf = cmfDen > 0 ? cmfNum / cmfDen : 0;
+                // Accumulation / Distribution (last value)
+                let ad = 0;
+                for (let i = 0; i <= n; i++) {
+                    const mfMult = ((closes[i] - lows[i]) - (highs[i] - closes[i])) / ((highs[i] - lows[i]) || 1);
+                    ad += mfMult * volumes[i];
+                }
+                const adSlope = (ad - (() => { let x = 0; for (let i = 0; i <= n - 20; i++) {
+                    const m = ((closes[i] - lows[i]) - (highs[i] - closes[i])) / ((highs[i] - lows[i]) || 1);
+                    x += m * volumes[i];
+                } return x; })());
+                // Volume profile (POC = price bucket with highest volume)
+                const bucketCount = 12;
+                const pHiAll = Math.max(...highs), pLoAll = Math.min(...lows);
+                const bucketSize = (pHiAll - pLoAll) / bucketCount || 1;
+                const buckets = new Array(bucketCount).fill(0);
+                for (let i = 0; i < closes.length; i++) {
+                    const b = Math.min(bucketCount - 1, Math.floor((closes[i] - pLoAll) / bucketSize));
+                    buckets[b] += volumes[i];
+                }
+                const pocIdx = buckets.indexOf(Math.max(...buckets));
+                const valueAreaPrice = pLoAll + (pocIdx + 0.5) * bucketSize;
+
+                // Trend strength
+                const adxData   = QuantMathEngine.ADX(highs, lows, closes, 14);
+                const atrArr    = QuantMathEngine.ATR(highs, lows, closes, 14);
+                const atr       = atrArr[n] || price * 0.02;
+                // Supertrend (10, 3)
+                const stMult = 3;
+                const hl2    = (highs[n] + lows[n]) / 2;
+                const stUp   = hl2 - stMult * atr;
+                const stDn   = hl2 + stMult * atr;
+                const supertrend = price > stUp ? 'bullish' : price < stDn ? 'bearish' : 'neutral';
+                // Chandelier Exit (22, 3)
+                const chHi = Math.max(...highs.slice(n - 22, n + 1));
+                const chandelierLong = chHi - 3 * atr;
+
+                // Volatility
+                const bbW = 20;
+                const bbMid = SMA(closes, bbW)[n];
+                const bbSlice = closes.slice(n - bbW + 1, n + 1);
+                const bbStd = Math.sqrt(bbSlice.reduce((a, b) => a + (b - bbMid) ** 2, 0) / bbW);
+                const bbUpper = bbMid + 2 * bbStd;
+                const bbLower = bbMid - 2 * bbStd;
+                const bbWidth = (bbUpper - bbLower) / bbMid;
+                // Keltner (20, 2)
+                const kcMid = ema20[n];
+                const kcUpper = kcMid + 2 * atr;
+                const kcLower = kcMid - 2 * atr;
+                // BB Squeeze = BB inside Keltner
+                const bbSqueeze = bbUpper < kcUpper && bbLower > kcLower;
+
+                return {
+                    price, atr,
+                    trend: { ema20: ema20[n], ema50: ema50[n], ema100: ema100[n], ema200: ema200[n],
+                             sma50: sma50[n], sma200: sma200[n], goldenCross, deathCross, maAligned },
+                    momentum: { rsi: rsi[n], stochRSI, momentum, macd: macd.macd[n], macdSignal: macd.signal[n],
+                                macdHist: macd.hist[n], histExpand, rsiDivergence, hiddenRsiDivergence },
+                    volume: { relVolume, volumeBreakout, obv: obv[n], obvSlope, cmf, ad, adSlope,
+                              poc: valueAreaPrice },
+                    strength: { adx: adxData.adx[n], plusDI: adxData.plusDI[n], minusDI: adxData.minusDI[n],
+                                supertrend, chandelierLong },
+                    volatility: { atr, bbUpper, bbMid, bbLower, bbWidth, kcUpper, kcLower, bbSqueeze }
+                };
+            }
+
+            // -- chart pattern detection ---------------------------------
+            function detectPatterns(ohlcv, ind) {
+                const closes = ohlcv.map(d => d.close);
+                const highs  = ohlcv.map(d => d.high);
+                const lows   = ohlcv.map(d => d.low);
+                const n = closes.length - 1;
+                const price = closes[n], atr = ind.atr;
+                const found = [];
+
+                const recentHi = Math.max(...highs.slice(n - 30, n + 1));
+                const recentLo = Math.min(...lows.slice(n - 30, n + 1));
+
+                // helper to push
+                const push = (name, dir, conf, breakout, target, stop) =>
+                    found.push({ name, dir, conf: Math.min(99, Math.round(conf)),
+                                 breakout: +breakout.toFixed(2),
+                                 target:   +target.toFixed(2),
+                                 stop:     +stop.toFixed(2) });
+
+                // Bullish
+                if (ind.trend.maAligned && ind.volume.relVolume > 1.4 && price > recentHi * 0.98)
+                    push('Ascending Triangle', 'bullish', 70 + ind.volume.relVolume * 6, recentHi, recentHi + 2 * atr, recentLo);
+                if (price > ind.trend.ema20 && closes[n - 1] < ind.trend.ema20 && ind.momentum.macdHist > 0)
+                    push('Bull Flag', 'bullish', 65, price, price + 3 * atr, price - 1.5 * atr);
+                if (ind.volatility.bbSqueeze && ind.momentum.histExpand)
+                    push('Bull Pennant', 'bullish', 72, price, price + 2.5 * atr, price - 1.5 * atr);
+                // Double Bottom: two lows within 3% near recentLo
+                const lowsWin = lows.slice(n - 50, n + 1);
+                const minTwo = [...lowsWin].sort((a, b) => a - b).slice(0, 4);
+                if (minTwo.length >= 2 && Math.abs(minTwo[0] - minTwo[1]) / minTwo[0] < 0.03 && price > minTwo[0] * 1.05)
+                    push('Double Bottom', 'bullish', 75, recentHi * 0.95, recentHi * 1.1, minTwo[0] * 0.98);
+                if (price < recentHi && price > recentLo && ind.momentum.rsi > 55 && ind.trend.goldenCross)
+                    push('Cup and Handle', 'bullish', 78, recentHi, recentHi + 4 * atr, price - 2 * atr);
+                if (ind.momentum.rsiDivergence === 'bullish' && price > closes[n - 5])
+                    push('Inverse Head and Shoulders', 'bullish', 68, price, price + 4 * atr, price - 2 * atr);
+                if (ind.volume.cmf > 0.15 && ind.trend.maAligned)
+                    push('Rounded Bottom', 'bullish', 60, price, price + 5 * atr, recentLo);
+                if (ind.volatility.bbWidth < 0.05 && ind.momentum.macdHist > 0)
+                    push('Falling Wedge', 'bullish', 64, price, price + 3 * atr, price - 1.5 * atr);
+
+                // Bearish
+                if (ind.trend.deathCross || (!ind.trend.maAligned && ind.momentum.rsi < 40 && price < ind.trend.ema50))
+                    push('Descending Triangle', 'bearish', 68, recentLo, recentLo - 2 * atr, recentHi);
+                if (ind.momentum.rsiDivergence === 'bearish')
+                    push('Head and Shoulders', 'bearish', 72, price, price - 4 * atr, price + 2 * atr);
+                if (ind.volume.cmf < -0.1 && price < ind.trend.ema50)
+                    push('Bear Flag', 'bearish', 65, price, price - 3 * atr, price + 1.5 * atr);
+                const maxTwo = [...highs.slice(n - 50, n + 1)].sort((a, b) => b - a).slice(0, 4);
+                if (maxTwo.length >= 2 && Math.abs(maxTwo[0] - maxTwo[1]) / maxTwo[0] < 0.03 && price < maxTwo[0] * 0.95)
+                    push('Double Top', 'bearish', 74, recentLo, recentLo - 3 * atr, maxTwo[0] * 1.02);
+                if (ind.volume.relVolume > 1.5 && price < ind.trend.ema20 && ind.momentum.macdHist < 0)
+                    push('Rising Wedge', 'bearish', 66, price, price - 3 * atr, price + 1.5 * atr);
+
+                // Neutral / breakout
+                if (ind.volatility.bbSqueeze)
+                    push('Bollinger Squeeze', 'neutral', 60 + (ind.momentum.histExpand ? 15 : 0),
+                         price, price + 3 * atr, price - 3 * atr);
+                if (price > recentHi * 0.995 && ind.volume.volumeBreakout)
+                    push('Range Breakout', 'bullish', 80, recentHi, recentHi + 3 * atr, recentHi - 2 * atr);
+                if (price < recentLo * 1.005 && ind.volume.relVolume > 1.3)
+                    push('Range Breakdown', 'bearish', 78, recentLo, recentLo - 3 * atr, recentLo + 2 * atr);
+                if (Math.abs(price - ((recentHi + recentLo) / 2)) / price < 0.02)
+                    push('Symmetrical Triangle', 'neutral', 55, price, price + 2 * atr, price - 2 * atr);
+
+                return found.sort((a, b) => b.conf - a.conf).slice(0, 6);
+            }
+
+            // -- Fibonacci ------------------------------------------------
+            function fibonacci(ohlcv) {
+                const window = Math.min(120, ohlcv.length);
+                const slice = ohlcv.slice(-window);
+                const hi = Math.max(...slice.map(d => d.high));
+                const lo = Math.min(...slice.map(d => d.low));
+                const range = hi - lo;
+                const price = ohlcv[ohlcv.length - 1].close;
+                const ratios = { '23.6%': 0.236, '38.2%': 0.382, '50%': 0.5, '61.8%': 0.618, '78.6%': 0.786 };
+                const ext    = { '127.2%': 1.272, '161.8%': 1.618, '261.8%': 2.618 };
+                const retr   = Object.fromEntries(Object.entries(ratios).map(([k, v]) => [k, +(hi - v * range).toFixed(2)]));
+                const exts   = Object.fromEntries(Object.entries(ext).map(([k, v]) => [k, +(lo + v * range).toFixed(2)]));
+                // Identify current fib zone
+                let zone = 'Outside Range';
+                const levels = [['78.6%', retr['78.6%']], ['61.8%', retr['61.8%']], ['50%', retr['50%']],
+                                ['38.2%', retr['38.2%']], ['23.6%', retr['23.6%']]];
+                for (let i = 0; i < levels.length - 1; i++) {
+                    if (price >= levels[i][1] && price <= levels[i + 1][1]) { zone = `${levels[i][0]} – ${levels[i + 1][0]}`; break; }
+                }
+                const support    = Object.entries(retr).filter(([, v]) => v < price).sort((a, b) => b[1] - a[1])[0] || null;
+                const resistance = Object.entries(retr).filter(([, v]) => v > price).sort((a, b) => a[1] - b[1])[0] || null;
+                return { hi: +hi.toFixed(2), lo: +lo.toFixed(2), retr, exts, zone,
+                         support, resistance,
+                         upside:   exts['127.2%'],
+                         downside: retr['78.6%'] };
+            }
+
+            // -- Support / Resistance ------------------------------------
+            function supportResistance(ohlcv, price, atr) {
+                const window = Math.min(180, ohlcv.length);
+                const slice  = ohlcv.slice(-window);
+                const tol    = atr * 0.8;
+                // Find pivots (3-bar swings)
+                const swingHighs = [], swingLows = [];
+                for (let i = 2; i < slice.length - 2; i++) {
+                    const h = slice[i].high, l = slice[i].low;
+                    if (h > slice[i - 1].high && h > slice[i - 2].high && h > slice[i + 1].high && h > slice[i + 2].high) swingHighs.push(h);
+                    if (l < slice[i - 1].low  && l < slice[i - 2].low  && l < slice[i + 1].low  && l < slice[i + 2].low)  swingLows.push(l);
+                }
+                // Cluster levels
+                const cluster = arr => {
+                    const out = [];
+                    arr.sort((a, b) => a - b).forEach(v => {
+                        const found = out.find(c => Math.abs(c.price - v) < tol);
+                        if (found) { found.touches++; found.price = (found.price * (found.touches - 1) + v) / found.touches; }
+                        else out.push({ price: v, touches: 1 });
+                    });
+                    return out;
+                };
+                const resistances = cluster(swingHighs).filter(c => c.price > price).sort((a, b) => a.price - b.price);
+                const supports    = cluster(swingLows ).filter(c => c.price < price).sort((a, b) => b.price - a.price);
+                const tag = (arr, kind) => arr.slice(0, 4).map(c => ({
+                    type:     c.touches >= 3 ? `Major ${kind}` : `Minor ${kind}`,
+                    price:    +c.price.toFixed(2),
+                    touches:  c.touches,
+                    strength: Math.min(100, c.touches * 22),
+                    distance: +(((c.price - price) / price) * 100).toFixed(2)
+                }));
+                return {
+                    supports:    tag(supports,    'Support'),
+                    resistances: tag(resistances, 'Resistance'),
+                    breakoutZone:  resistances[0] ? +resistances[0].price.toFixed(2) : null,
+                    breakdownZone: supports[0]    ? +supports[0].price.toFixed(2)    : null,
+                    liquidityZone: supports[0] && resistances[0]
+                        ? +(((supports[0].price + resistances[0].price) / 2)).toFixed(2) : null
+                };
+            }
+
+            // -- Fundamental scoring (NSE stock proxies — purely TA-derived,
+            //    since no fundamental feed is available client-side) ------
+            function fundamentalScore(ohlcv, ind) {
+                const price = ind.price;
+                const volumes = ohlcv.map(d => d.volume);
+                const avgVol60 = volumes.slice(-60).reduce((a, b) => a + b, 0) / 60 || 1;
+                const avgVol20 = volumes.slice(-20).reduce((a, b) => a + b, 0) / 20 || 1;
+                // Liquidity score: higher avg traded value = better
+                const turnoverCr = (avgVol20 * price) / 1e7;
+                const liquidityScore = Math.min(100, turnoverCr / 5);
+                // Capital flow score from OBV slope & CMF
+                const capitalFlowScore = Math.max(0, Math.min(100,
+                    50 + ind.volume.cmf * 200 + (ind.volume.obvSlope > 0 ? 20 : -20)));
+                // Institutional participation proxy: volume consistency
+                const volStd = stdev(volumes.slice(-60), 60);
+                const volConsistency = Math.max(0, 100 - (volStd / avgVol60) * 50);
+                const institutionalScore = Math.round((volConsistency + Math.min(100, avgVol60 / 100000)) / 2);
+                // Market structure score from trend alignment
+                const structureScore = ind.trend.maAligned ? 90 : ind.trend.goldenCross ? 70 : ind.trend.deathCross ? 20 : 50;
+                // Overall fundamental score
+                const overall = Math.round(0.30 * liquidityScore
+                                         + 0.25 * capitalFlowScore
+                                         + 0.20 * institutionalScore
+                                         + 0.25 * structureScore);
+                return {
+                    turnoverCr:        +turnoverCr.toFixed(2),
+                    avgDailyVol:       Math.round(avgVol20),
+                    liquidityScore:    Math.round(liquidityScore),
+                    capitalFlowScore:  Math.round(capitalFlowScore),
+                    institutionalScore,
+                    structureScore,
+                    overall
+                };
+            }
+
+            // -- Weighted scoring + Value/Swing/Balanced classification --
+            function classify(ind, patterns, fib, sr, fund) {
+                // Bullish / bearish indicator points
+                let bullish = 0, bearish = 0;
+                if (ind.trend.maAligned)       bullish += 18; else bearish += 8;
+                if (ind.trend.goldenCross)     bullish += 10;
+                if (ind.trend.deathCross)      bearish += 12;
+                if (ind.momentum.rsi > 55)     bullish += 8; else if (ind.momentum.rsi < 45) bearish += 8;
+                if (ind.momentum.macdHist > 0) bullish += 8; else bearish += 6;
+                if (ind.momentum.histExpand)   bullish += 6;
+                if (ind.momentum.rsiDivergence === 'bullish') bullish += 8;
+                if (ind.momentum.rsiDivergence === 'bearish') bearish += 10;
+                if (ind.volume.volumeBreakout) bullish += 12;
+                if (ind.volume.cmf > 0.1)      bullish += 6; else if (ind.volume.cmf < -0.1) bearish += 6;
+                if (ind.volume.obvSlope > 0)   bullish += 5; else bearish += 5;
+                if (ind.strength.adx > 25 && ind.strength.plusDI > ind.strength.minusDI) bullish += 10;
+                if (ind.strength.adx > 25 && ind.strength.minusDI > ind.strength.plusDI) bearish += 10;
+                if (ind.strength.supertrend === 'bullish') bullish += 8;
+                if (ind.strength.supertrend === 'bearish') bearish += 8;
+
+                // Pattern weight
+                patterns.forEach(p => {
+                    const w = p.conf / 10;
+                    if (p.dir === 'bullish') bullish += w;
+                    if (p.dir === 'bearish') bearish += w;
+                });
+
+                // Clamp 0..100
+                bullish = Math.max(0, Math.min(100, Math.round(bullish)));
+                bearish = Math.max(0, Math.min(100, Math.round(bearish)));
+
+                // Weighted technical score (trend 30 / momentum 25 / volume 25 / pattern 20)
+                const trendScore    = (ind.trend.maAligned ? 100 : ind.trend.goldenCross ? 75 : ind.trend.deathCross ? 15 : 50);
+                const momentumScore = Math.max(0, Math.min(100, 50 + ind.momentum.momentum * 2 + (ind.momentum.histExpand ? 10 : 0)));
+                const volumeScore   = Math.max(0, Math.min(100, ind.volume.relVolume * 25 + ind.volume.cmf * 100));
+                const patternScore  = patterns.length ? Math.min(100, patterns[0].conf + patterns.length * 4) : 25;
+                const technical     = Math.round(0.30 * trendScore + 0.25 * momentumScore + 0.25 * volumeScore + 0.20 * patternScore);
+
+                // Composite scores
+                const swingScore    = Math.round(0.55 * technical + 0.20 * (patternScore) + 0.25 * bullish);
+                const valueScore    = Math.round(0.55 * fund.overall + 0.20 * trendScore + 0.25 * (100 - Math.min(100, ind.volatility.bbWidth * 800)));
+                const balancedScore = Math.round(0.50 * swingScore + 0.50 * valueScore);
+                const confidence    = Math.round((technical * 0.4 + fund.overall * 0.3 + (patterns.length ? patterns[0].conf : 50) * 0.3));
+
+                // Classification
+                let pick = 'Watch';
+                if (valueScore >= 70 && swingScore < 65)        pick = 'Value';
+                else if (swingScore >= 70 && valueScore < 65)   pick = 'Swing';
+                else if (balancedScore >= 68 && Math.abs(valueScore - swingScore) < 18) pick = 'Balanced';
+
+                let action = 'Avoid';
+                if (confidence >= 80 && bullish > bearish + 20)      action = 'Strong Buy';
+                else if (confidence >= 65 && bullish > bearish + 10) action = 'Buy';
+                else if (confidence >= 50)                           action = 'Watch';
+
+                return { bullish, bearish, confidence, technical,
+                         valueScore, swingScore, balancedScore,
+                         pick, action,
+                         weights: { trend: trendScore, momentum: momentumScore, volume: volumeScore, pattern: patternScore } };
+            }
+
+            // -- Top-level analyze() --------------------------------------
+            function analyze(ticker, ohlcv) {
+                const ind      = indicators(ohlcv);
+                const patterns = detectPatterns(ohlcv, ind);
+                const fib      = fibonacci(ohlcv);
+                const sr       = supportResistance(ohlcv, ind.price, ind.atr);
+                const fund     = fundamentalScore(ohlcv, ind);
+                const cls      = classify(ind, patterns, fib, sr, fund);
+                // Trade plan from ATR
+                const entry = ind.price;
+                const sl    = +(entry - 1.5 * ind.atr).toFixed(2);
+                const t1    = +(entry + 1.5 * ind.atr).toFixed(2);
+                const t2    = +(entry + 3.0 * ind.atr).toFixed(2);
+                const t3    = +(entry + 5.0 * ind.atr).toFixed(2);
+                return { ticker, price: ind.price, ind, patterns, fib, sr, fund, cls,
+                         trade: { entry, sl, t1, t2, t3, rr: +((t1 - entry) / (entry - sl || 1)).toFixed(2) },
+                         raw: ohlcv };
+            }
+
+            return { analyze, indicators, detectPatterns, fibonacci, supportResistance, fundamentalScore, classify };
+        })();
+
+        // Replace legacy crunchAnalyticsForStock with MasterEngine-driven version,
+        // keeping the same shape that downstream Analytics/Virtual rely on.
+        const __legacyCrunch = crunchAnalyticsForStock;
+        crunchAnalyticsForStock = function(ticker, ohlcv) {
+            const m = MasterEngine.analyze(ticker, ohlcv);
+            // Build a back-compatible record:
+            const breakdown = [];
+            if (m.ind.trend.maAligned)       breakdown.push({ name: 'MA Stack Aligned (20>50>100>200)', points: 18, val: 'Bull Stack' });
+            if (m.ind.trend.goldenCross)     breakdown.push({ name: 'Golden Cross (50>200 SMA)',          points: 12, val: 'Confirmed' });
+            if (m.ind.momentum.histExpand)   breakdown.push({ name: 'MACD Histogram Expansion',           points:  8, val: '3-bar' });
+            if (m.ind.volume.volumeBreakout) breakdown.push({ name: 'Volume Breakout',                     points: 12, val: m.ind.volume.relVolume.toFixed(2) + 'x' });
+            if (m.ind.strength.adx > 25)     breakdown.push({ name: 'ADX Trend Strength',                  points: 10, val: m.ind.strength.adx.toFixed(1) });
+            if (m.ind.volume.cmf > 0.1)      breakdown.push({ name: 'CMF Money Inflow',                    points:  6, val: m.ind.volume.cmf.toFixed(2) });
+            if (m.patterns.length)           breakdown.push({ name: 'Pattern: ' + m.patterns[0].name,      points: m.patterns[0].conf / 10, val: m.patterns[0].dir });
+            return {
+                ticker, price: m.price,
+                score: m.cls.confidence,
+                action: m.cls.action,
+                pattern: m.patterns[0] ? m.patterns[0].name : 'No Distinct Pattern',
+                metrics: { rsi: m.ind.momentum.rsi, adx: m.ind.strength.adx, volRatio: m.ind.volume.relVolume },
+                breakdown,
+                targets: { entryZone: m.trade.entry, target1: m.trade.t1, target2: m.trade.t2,
+                           stopLoss: m.trade.sl, rrRatio: m.trade.rr, atr: m.ind.atr },
+                raw: ohlcv,
+                // new institutional payload:
+                master: m
+            };
+        };
+
+        // --- 4. REAL OHLCV FETCHER (Yahoo Finance v8/chart — 1 year daily data) ---
+        async function _fetchRealOHLCV(ticker) {
+            if (realOHLCVCache[ticker]) return realOHLCVCache[ticker];
+            if (ohlcvFetchInProgress[ticker]) {
+                // Wait up to 12s for the in-progress fetch
+                for (let i = 0; i < 120; i++) {
+                    await new Promise(r => setTimeout(r, 100));
+                    if (realOHLCVCache[ticker]) return realOHLCVCache[ticker];
+                }
+                return null;
+            }
+            ohlcvFetchInProgress[ticker] = true;
+            const symbol = ticker.replace('&', '%26') + '.NS';
+            const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1y`;
+            for (const tryProxy of _buildProxies(yahooUrl)) {
+                try {
+                    const data = await tryProxy();
+                    const result = data?.chart?.result?.[0];
+                    if (!result) continue;
+                    const meta = result.meta;
+                    const timestamps = result.timestamp;
+                    const q = result.indicators?.quote?.[0];
+                    if (!timestamps || !q || !q.close) continue;
+                    const ohlcv = [];
+                    for (let i = 0; i < timestamps.length; i++) {
+                        if (q.close[i] == null) continue;
+                        ohlcv.push({
+                            date: new Date(timestamps[i] * 1000),
+                            open:   Number((q.open[i]   || q.close[i]).toFixed(2)),
+                            high:   Number((q.high[i]   || q.close[i]).toFixed(2)),
+                            low:    Number((q.low[i]    || q.close[i]).toFixed(2)),
+                            close:  Number(q.close[i].toFixed(2)),
+                            volume: q.volume[i] || 0
+                        });
+                    }
+                    if (ohlcv.length < 30) continue; // too sparse, try next proxy
+                    // Also cache the latest real price
+                    const livePrice = meta.regularMarketPrice ?? meta.previousClose ?? null;
+                    if (livePrice && livePrice > 0) liveNSEPrices[ticker] = livePrice;
+                    realOHLCVCache[ticker] = ohlcv;
+                    ohlcvFetchInProgress[ticker] = false;
+                    return ohlcv;
+                } catch (_) { /* try next proxy */ }
+            }
+            ohlcvFetchInProgress[ticker] = false;
+            return null; // all proxies failed
+        }
+
+        // Synchronous fallback: generate synthetic OHLCV if real data isn't available yet.
+        // Labeled clearly so UI can show "SIM" badges.
+        function generateHistoricalData(ticker) {
+            let length = 95;
+            let prices = [];
+            let seededRandom = function(str) {
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                return function() { hash = (hash * 1664525 + 1013904223) % 4294967296; return hash / 4294967296; }
+            };
+            let rand = seededRandom(ticker);
+            let basePrice = 200 + rand() * 2500;
+            let currentTrendBias = (rand() > 0.4) ? 0.0015 : -0.0008;
+            let currentPrice = basePrice;
+            let currentDate = new Date();
+            currentDate.setDate(currentDate.getDate() - length);
+
+            for (let i = 0; i < length; i++) {
+                let dailyVolatility = 0.018;
+                let dailyChange = currentPrice * (currentTrendBias + (rand() - 0.48) * dailyVolatility);
+                let open = currentPrice;
+                let close = currentPrice + dailyChange;
+                let high = Math.max(open, close) + (rand() * currentPrice * 0.012);
+                let low = Math.min(open, close) - (rand() * currentPrice * 0.012);
+                let baseVolume = 500000 + Math.floor(rand() * 4500000);
+                let volMult = (i > length - 4 && rand() > 0.6) ? 2.1 : (0.7 + rand() * 0.6);
+                let volume = Math.floor(baseVolume * volMult);
+
+                prices.push({
+                    date: new Date(currentDate),
+                    open: Number(open.toFixed(2)),
+                    high: Number(high.toFixed(2)),
+                    low: Number(low.toFixed(2)),
+                    close: Number(close.toFixed(2)),
+                    volume: volume
+                });
+                currentPrice = close;
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            return prices;
+        }
+
+        // Get OHLCV: return cached real data if available, else synthetic
+        function getOHLCV(ticker) {
+            return realOHLCVCache[ticker] || generateHistoricalData(ticker);
+        }
+        function isRealData(ticker) { return !!realOHLCVCache[ticker]; }
+
+        // --- 5. PATTERN COGNITION ENGINE ---
+        function runPatternRecognition(ohlcv) {
+            let lastIdx = ohlcv.length - 1;
+            let cur = ohlcv[lastIdx];
+            let prev = ohlcv[lastIdx - 1];
+            let body = Math.abs(cur.close - cur.open);
+            let isBullish = cur.close > cur.open;
+            
+            if(!prev.isBullish && isBullish && cur.close > prev.open && cur.open < prev.close) {
+                return "Bullish Engulfing";
+            }
+            let lowerShadow = Math.min(cur.open, cur.close) - cur.low;
+            let upperShadow = cur.high - Math.max(cur.open, cur.close);
+            if(lowerShadow > (body * 2) && upperShadow < (body * 0.5)) {
+                return "Hammer Reversal";
+            }
+            if(cur.close > prev.high && cur.volume > 1.8) {
+                return "Flat Base Breakout";
+            }
+            return "EMA Bounce Confirmation";
+        }
+
+        // --- 6. QUANT QUANTITATIVE SCORING CORE ---
+        function crunchAnalyticsForStock(ticker, historicalData) {
+            let closes = historicalData.map(d => d.close);
+            let highs = historicalData.map(d => d.high);
+            let lows = historicalData.map(d => d.low);
+            let volumes = historicalData.map(d => d.volume);
+            let last = historicalData.length - 1;
+
+            let ema20 = QuantMathEngine.EMA(closes, 20);
+            let ema50 = QuantMathEngine.EMA(closes, 50);
+            let ema200 = QuantMathEngine.EMA(closes, 200);
+            let rsi = QuantMathEngine.RSI(closes, 14);
+            let macdData = QuantMathEngine.MACD(closes);
+            let atr = QuantMathEngine.ATR(highs, lows, closes, 14);
+            let adxData = QuantMathEngine.ADX(highs, lows, closes, 14);
+
+            let curPrice = closes[last];
+            let curVol = volumes[last];
+            let avgVol = volumes.slice(last-20, last).reduce((a,b)=>a+b, 0) / 20;
+
+            let score = 0;
+            let breakdown = [];
+
+            if(curPrice > ema20[last] && ema20[last] > ema50[last] && ema50[last] > ema200[last]) {
+                score += 25; breakdown.push({name: "EMA Bull Stack Alignment", points: 25, val: "Price > EMA20 > EMA50 > EMA200"});
+            }
+            let curRsi = rsi[last];
+            if(curRsi >= 40 && curRsi <= 75) {
+                score += 15; breakdown.push({name: "RSI Strategic Buy Zone", points: 15, val: curRsi.toFixed(1)});
+            }
+            if(macdData.hist[last] > 0 && macdData.hist[last-1] <= 0) {
+                score += 15; breakdown.push({name: "MACD Crossover / Expansion", points: 15, val: "Bullish Delta"});
+            } else if (macdData.hist[last] > 0) {
+                score += 10; breakdown.push({name: "MACD Positive Momentum", points: 10, val: "Histogram Expanding"});
+            }
+            let volRatio = curVol / avgVol;
+            if(volRatio > 1.5) {
+                score += 15; breakdown.push({name: "Volume Surge Accumulation", points: 15, val: volRatio.toFixed(2) + "x"});
+            }
+            if(adxData.adx[last] > 25 && adxData.plusDI[last] > adxData.minusDI[last]) {
+                score += 10; breakdown.push({name: "ADX Trend Strength Confirmed", points: 10, val: adxData.adx[last].toFixed(1)});
+            }
+            if(curPrice > (ema20[last] - 0.5 * atr[last])) {
+                score += 10; breakdown.push({name: "Supertrend Line Bullish Support", points: 10, val: "Above Trailing Band"});
+            }
+            let pattern = runPatternRecognition(historicalData);
+            if(pattern) {
+                score += 10; breakdown.push({name: `Pattern Found: ${pattern}`, points: 10, val: "Confirmed Trigger"});
+            }
+
+            let action = "Avoid";
+            if(score >= 80) action = "Strong Buy";
+            else if(score >= 60) action = "Buy";
+            else if(score >= 40) action = "Watch";
+
+            let curAtr = atr[last] || (curPrice * 0.02);
+            let entryZone = curPrice;
+            let target1 = entryZone + (1.5 * curAtr);
+            let target2 = entryZone + (3.0 * curAtr);
+            let stopLoss = entryZone - (1.5 * curAtr);
+            let rrRatio = (target1 - entryZone) / (entryZone - stopLoss || 1);
+
+            return {
+                ticker, price: curPrice, score, action, pattern,
+                metrics: { rsi: curRsi, adx: adxData.adx[last], volRatio },
+                breakdown, targets: { entryZone, target1, target2, stopLoss, rrRatio, atr: curAtr },
+                raw: historicalData
+            };
+        }
+
+        // --- 7. UI APPLICATION ROUTING LOGIC ---
+        function switchTab(tabId) {
+            // analytics tab removed — redirect to masterswings
+            if (tabId === 'analytics') tabId = 'masterswings';
+            currentActiveTab = tabId;
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
+            const panel = document.getElementById(`content-${tabId}`);
+            if (panel) panel.classList.remove('hidden');
+            
+            document.querySelectorAll('button[id^="tab-"]').forEach(btn => {
+                btn.classList.remove('border-indigo-500', 'text-indigo-400');
+                btn.classList.add('border-transparent', 'text-gray-400');
+            });
+            const activeTab = document.getElementById(`tab-${tabId}`);
+            if (activeTab) {
+                activeTab.classList.add('border-indigo-500', 'text-indigo-400');
+                activeTab.classList.remove('border-transparent', 'text-gray-400');
+            }
+            
+            if(tabId === 'virtual') renderVirtualPortfolio();
+        }
+
+        // --- 8. SCAN ENGINE SCHEDULER ---
+        function runGlobalScan() {
+            const bar = document.getElementById('progressBar');
+            const container = document.getElementById('progressContainer');
+            const icon = document.getElementById('refreshIcon');
+            
+            container.classList.remove('hidden');
+            icon.classList.add('animate-spin');
+            bar.style.width = '0%';
+
+            let index = 0;
+            function scanNext() {
+                if(index >= NIFTY_200_TICKERS.length) {
+                    setTimeout(() => {
+                        container.classList.add('hidden');
+                        icon.classList.remove('animate-spin');
+                        document.getElementById('timestamp').innerText = new Date().toLocaleTimeString() + " (Sync Active)";
+                        /* screener removed */
+                        populateMasterSwings();
+                        populateCards();
+                        initializeAnalyticsDropdown();
+                        renderVirtualPortfolio();
+                        safeCreateIcons();
+                        // Fetch real OHLCV + live prices in the background
+                        _upgradeToRealOHLCV();
+                    }, 400);
+                    return;
+                }
+
+                let ticker = NIFTY_200_TICKERS[index];
+                let dataset = getOHLCV(ticker);
+                globalScanDataset[ticker] = crunchAnalyticsForStock(ticker, dataset);
+
+                index++;
+                bar.style.width = `${(index / NIFTY_200_TICKERS.length) * 100}%`;
+                setTimeout(scanNext, 8);
+            }
+            scanNext();
+        }
+
+        // Background upgrade: fetch real OHLCV for all tickers, then re-score
+        async function _upgradeToRealOHLCV() {
+            const bar = document.getElementById('screenerPriceStatus');
+            const dot = document.getElementById('screenerPriceStatusDot');
+            const txt = document.getElementById('screenerPriceStatusText');
+            if (bar) { bar.style.display = 'flex'; bar.classList.remove('hidden'); }
+            if (dot) dot.className = 'w-1.5 h-1.5 rounded-full bg-yellow-400 inline-block flex-shrink-0 animate-pulse';
+            if (txt) { txt.className = 'text-yellow-300'; txt.textContent = 'Fetching real OHLCV data…'; }
+
+            let fetched = 0;
+            const BATCH = 4;
+            for (let i = 0; i < NIFTY_200_TICKERS.length; i += BATCH) {
+                const batch = NIFTY_200_TICKERS.slice(i, i + BATCH);
+                await Promise.all(batch.map(async ticker => {
+                    const ohlcv = await _fetchRealOHLCV(ticker);
+                    if (ohlcv && ohlcv.length >= 30) {
+                        globalScanDataset[ticker] = crunchAnalyticsForStock(ticker, ohlcv);
+                        fetched++;
+                    }
+                }));
+                if (txt) txt.textContent = `Real OHLCV: ${fetched}/${NIFTY_200_TICKERS.length} stocks upgraded…`;
+                await new Promise(r => setTimeout(r, 300));
+            }
+
+            // Refresh UI with real data
+            /* screener removed */
+            populateMasterSwings();
+            populateCards();
+            if (currentActiveTab === 'virtual') renderVirtualPortfolio();
+            safeCreateIcons();
+
+            const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            if (fetched > 0) {
+                if (dot) dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block flex-shrink-0';
+                if (txt) { txt.className = 'text-emerald-400'; txt.textContent = `✓ ${fetched}/${NIFTY_200_TICKERS.length} real OHLCV loaded · ${timeStr}`; }
+                document.getElementById('timestamp').innerText = new Date().toLocaleTimeString() + " (Real Data Active)";
+            } else {
+                if (dot) dot.className = 'w-1.5 h-1.5 rounded-full bg-red-400 inline-block flex-shrink-0';
+                if (txt) { txt.className = 'text-yellow-400'; txt.textContent = '⚠ Real data unavailable — using synthetic fallback'; }
+            }
+        }
+        // --- 9. (Screener removed — engine now exclusively powers Master Swings & My Picks) ---
+        // --- INSTITUTIONAL MASTER SWINGS RENDER (v3.0) ---
+        function populateMasterSwings() {
+            const body = document.getElementById('masterSwingsTableBody');
+            if (!body) return;
+            body.innerHTML = "";
+
+            const items = Object.values(globalScanDataset).filter(s => s && s.master);
+            if (items.length === 0) {
+                body.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-gray-500">Run Scan Universe to generate Master Swing candidates.</td></tr>`;
+                return;
+            }
+
+            // Sort by confidence
+            items.sort((a, b) => b.master.cls.confidence - a.master.cls.confidence);
+
+            // Stats
+            const aPlus     = items.filter(s => s.master.cls.confidence >= 80).length;
+            const breakouts = items.filter(s => s.master.patterns.some(p => /Breakout|Triangle|Flag|Pennant/i.test(p.name) && p.dir === 'bullish')).length;
+            const momentum  = items.filter(s => s.master.ind.momentum.momentum > 5 && s.master.ind.momentum.rsi >= 55).length;
+            const candidates = items.filter(s => s.master.cls.confidence >= 50).length;
+            document.getElementById('msCandidates').innerText = candidates;
+            document.getElementById('msAPlus').innerText      = aPlus;
+            document.getElementById('msBreakout').innerText   = breakouts;
+            document.getElementById('msMomentum').innerText   = momentum;
+            document.getElementById('msTotalCount').innerText = items.length;
+
+            items.forEach((stock, idx) => {
+                const m = stock.master;
+                const c = m.cls;
+                const setupType = c.confidence >= 80 ? 'A+'
+                                : c.action === 'Strong Buy' || c.action === 'Buy' ? 'Breakout'
+                                : m.ind.momentum.rsi >= 55 ? 'Momentum' : 'Standard';
+
+                const actionBadge = c.action === "Strong Buy" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                                  : c.action === "Buy"        ? "bg-teal-500/10 text-teal-400 border-teal-500/20"
+                                  : c.action === "Watch"      ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                  :                             "bg-red-500/10 text-red-400 border-red-500/20";
+
+                const pickBadge = c.pick === 'Value'    ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                                : c.pick === 'Swing'    ? 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30'
+                                : c.pick === 'Balanced' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                :                         'bg-gray-700/30 text-gray-400 border-gray-700';
+
+                const setupBadge = setupType === "A+"       ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                 : setupType === "Breakout" ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                                 : setupType === "Momentum" ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                 :                            "bg-gray-800 text-gray-400 border-gray-700";
+
+                const scoreColor = c.confidence >= 80 ? "text-emerald-400"
+                                 : c.confidence >= 65 ? "text-indigo-400"
+                                 : c.confidence >= 50 ? "text-amber-400"
+                                 :                      "text-gray-400";
+
+                const trendLabel = m.ind.trend.maAligned ? 'Full Bull Stack' : m.ind.trend.goldenCross ? 'Golden Cross' : m.ind.trend.deathCross ? 'Death Cross' : 'Mixed';
+                const trendColor = m.ind.trend.maAligned ? 'text-emerald-400' : m.ind.trend.goldenCross ? 'text-teal-400' : m.ind.trend.deathCross ? 'text-red-400' : 'text-gray-400';
+                const mtfLabel   = m.ind.strength.adx > 30 ? 'Strong Trend' : m.ind.strength.adx > 20 ? 'Developing' : 'Weak';
+                const mtfColor   = m.ind.strength.adx > 30 ? 'text-emerald-400' : m.ind.strength.adx > 20 ? 'text-amber-400' : 'text-gray-500';
+                const tvUrl = `https://www.tradingview.com/chart/?symbol=NSE%3A${stock.ticker}`;
+
+                // Main row
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-900/40 text-gray-300 transition ms-row border-b border-gray-800/40 cursor-pointer";
+                tr.dataset.ticker  = stock.ticker;
+                tr.dataset.action  = c.action;
+                tr.dataset.setup   = setupType;
+                tr.dataset.pattern = (m.patterns[0]?.name || '').toLowerCase();
+                tr.onclick = (e) => {
+                    if (e.target.closest('button') || e.target.closest('a')) return;
+                    const det = document.getElementById('ms-detail-' + idx);
+                    if (det) det.classList.toggle('hidden');
+                };
+
+                const topPattern = m.patterns[0];
+                tr.innerHTML = `
+                    <td class="p-3">
+                        <span class="font-bold text-white">${stock.ticker}</span>
+                        <span class="text-[10px] text-gray-500 block">.NS · <span class="px-1.5 py-0.5 rounded border text-[10px] font-semibold ${setupBadge}">${setupType}</span> · <span class="px-1.5 py-0.5 rounded border text-[10px] font-semibold ${pickBadge}">${c.pick} Pick</span></span>
+                    </td>
+                    <td class="p-3">
+                        <span class="font-black font-mono text-lg ${scoreColor}">${c.confidence}</span>
+                        <span class="text-[10px] text-gray-600 block">Conf · V${c.valueScore} S${c.swingScore} B${c.balancedScore}</span>
+                    </td>
+                    <td class="p-3 text-xs ${trendColor} font-medium">${trendLabel}<span class="block text-[10px] text-gray-600 font-mono">EMA20 ₹${m.ind.trend.ema20.toFixed(1)}</span></td>
+                    <td class="p-3 text-xs font-mono">
+                        <span class="${m.ind.momentum.rsi >= 55 ? 'text-emerald-400 font-bold' : 'text-gray-400'}">RSI ${m.ind.momentum.rsi.toFixed(1)}</span>
+                        <span class="block text-gray-600 text-[10px]">${m.ind.volume.relVolume.toFixed(2)}x Vol · MACD ${m.ind.momentum.macdHist.toFixed(2)}</span>
+                    </td>
+                    <td class="p-3 text-xs font-mono text-gray-300">
+                        ${c.bullish >= c.bearish ? `<span class="text-emerald-400">Bull ${c.bullish}</span>` : `<span class="text-red-400">Bear ${c.bearish}</span>`}
+                        <span class="block text-[10px] text-gray-600">Tech ${c.technical} · Fund ${m.fund.overall}</span>
+                    </td>
+                    <td class="p-3 text-xs ${mtfColor} font-medium">${mtfLabel}<span class="block text-gray-600 text-[10px] font-mono">ADX ${m.ind.strength.adx.toFixed(1)} · ST ${m.ind.strength.supertrend}</span></td>
+                    <td class="p-3"><span class="px-2.5 py-1 rounded text-xs font-bold border ${actionBadge}">${c.action}</span></td>
+                    <td class="p-3 text-right space-x-1 whitespace-nowrap">
+                        <button onclick="event.stopPropagation(); addToSandboxFromMaster('${stock.ticker}')" class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition cursor-pointer shadow" title="Add to Sandbox Trading">${SVG.plus} Pick</button>
+                        <button onclick="event.stopPropagation(); routeToAnalytics('${stock.ticker}')" class="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white text-xs font-semibold rounded-lg transition cursor-pointer shadow" title="Deep-Dive Analysis">${SVG.barChart}</button>
+                        <a href="${tvUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-sky-700 hover:bg-sky-600 text-white text-xs font-semibold rounded-lg transition cursor-pointer shadow" title="TradingView">${SVG.eye}</a>
+                    </td>
+                `;
+                body.appendChild(tr);
+
+                // Expandable detail row
+                const det = document.createElement('tr');
+                det.id = 'ms-detail-' + idx;
+                det.className = 'hidden bg-gray-950/60 border-b border-gray-800';
+                const patternsHtml = m.patterns.length
+                    ? m.patterns.map(p => `<div class="flex items-center justify-between gap-3 py-1 border-b border-gray-800/50">
+                            <span class="text-xs ${p.dir === 'bullish' ? 'text-emerald-300' : p.dir === 'bearish' ? 'text-red-300' : 'text-amber-300'}">${p.name}</span>
+                            <span class="text-[10px] font-mono text-gray-400">conf ${p.conf}% · BO ₹${p.breakout} · T ₹${p.target} · SL ₹${p.stop}</span>
+                        </div>`).join('')
+                    : '<span class="text-xs text-gray-500">No patterns detected.</span>';
+                const srHtml = `
+                    ${m.sr.resistances.slice(0,3).map(r => `<div class="flex justify-between text-[11px] font-mono"><span class="text-red-300">${r.type}</span><span>₹${r.price} · ${r.touches}x · ${r.distance}%</span></div>`).join('')}
+                    ${m.sr.supports.slice(0,3).map(r => `<div class="flex justify-between text-[11px] font-mono"><span class="text-emerald-300">${r.type}</span><span>₹${r.price} · ${r.touches}x · ${r.distance}%</span></div>`).join('')}
+                `;
+                const fibHtml = Object.entries(m.fib.retr).map(([k,v]) => `<div class="flex justify-between text-[11px] font-mono"><span class="text-gray-400">Retr ${k}</span><span class="${stock.price >= v ? 'text-emerald-300' : 'text-gray-300'}">₹${v}</span></div>`).join('')
+                                + Object.entries(m.fib.exts).map(([k,v]) => `<div class="flex justify-between text-[11px] font-mono"><span class="text-sky-400">Ext ${k}</span><span>₹${v}</span></div>`).join('');
+                det.innerHTML = `
+                    <td colspan="8" class="p-4">
+                        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                            <div class="bg-gray-900/60 border border-gray-800 rounded-lg p-3">
+                                <h4 class="text-[11px] font-bold text-indigo-300 uppercase tracking-wider mb-2">Indicators</h4>
+                                <div class="space-y-1 text-[11px] font-mono text-gray-300">
+                                    <div>EMA 20/50/100/200: ₹${m.ind.trend.ema20.toFixed(1)} · ${m.ind.trend.ema50.toFixed(1)} · ${m.ind.trend.ema100.toFixed(1)} · ${m.ind.trend.ema200.toFixed(1)}</div>
+                                    <div>SMA 50 / 200: ₹${m.ind.trend.sma50.toFixed(1)} · ${m.ind.trend.sma200.toFixed(1)}</div>
+                                    <div>Golden Cross: <span class="${m.ind.trend.goldenCross?'text-emerald-400':'text-gray-500'}">${m.ind.trend.goldenCross?'YES':'no'}</span> · Death: <span class="${m.ind.trend.deathCross?'text-red-400':'text-gray-500'}">${m.ind.trend.deathCross?'YES':'no'}</span></div>
+                                    <div>RSI: ${m.ind.momentum.rsi.toFixed(1)} · StochRSI: ${m.ind.momentum.stochRSI.toFixed(1)} · Mom: ${m.ind.momentum.momentum.toFixed(2)}%</div>
+                                    <div>MACD ${m.ind.momentum.macd.toFixed(2)} / Sig ${m.ind.momentum.macdSignal.toFixed(2)} / Hist ${m.ind.momentum.macdHist.toFixed(2)} ${m.ind.momentum.histExpand?'<span class="text-emerald-400">▲</span>':''}</div>
+                                    <div>RSI Div: <span class="${m.ind.momentum.rsiDivergence==='bullish'?'text-emerald-400':m.ind.momentum.rsiDivergence==='bearish'?'text-red-400':'text-gray-500'}">${m.ind.momentum.rsiDivergence}</span> · Hidden: ${m.ind.momentum.hiddenRsiDivergence}</div>
+                                    <div>Rel Volume: ${m.ind.volume.relVolume.toFixed(2)}x · OBV slope: ${m.ind.volume.obvSlope > 0 ? '<span class="text-emerald-400">▲</span>' : '<span class="text-red-400">▼</span>'}</div>
+                                    <div>CMF: ${m.ind.volume.cmf.toFixed(3)} · POC: ₹${m.ind.volume.poc.toFixed(1)}</div>
+                                    <div>ADX: ${m.ind.strength.adx.toFixed(1)} · +DI ${m.ind.strength.plusDI.toFixed(1)} / -DI ${m.ind.strength.minusDI.toFixed(1)}</div>
+                                    <div>Supertrend: <span class="${m.ind.strength.supertrend==='bullish'?'text-emerald-400':m.ind.strength.supertrend==='bearish'?'text-red-400':'text-gray-400'}">${m.ind.strength.supertrend}</span> · Chand: ₹${m.ind.strength.chandelierLong.toFixed(1)}</div>
+                                    <div>ATR: ₹${m.ind.atr.toFixed(2)} · BB ${m.ind.volatility.bbLower.toFixed(1)}–${m.ind.volatility.bbUpper.toFixed(1)} ${m.ind.volatility.bbSqueeze?'<span class="text-amber-300">SQUEEZE</span>':''}</div>
+                                    <div>Keltner: ${m.ind.volatility.kcLower.toFixed(1)} – ${m.ind.volatility.kcUpper.toFixed(1)}</div>
+                                </div>
+                            </div>
+                            <div class="bg-gray-900/60 border border-gray-800 rounded-lg p-3">
+                                <h4 class="text-[11px] font-bold text-indigo-300 uppercase tracking-wider mb-2">Patterns</h4>
+                                ${patternsHtml}
+                            </div>
+                            <div class="bg-gray-900/60 border border-gray-800 rounded-lg p-3">
+                                <h4 class="text-[11px] font-bold text-indigo-300 uppercase tracking-wider mb-2">Fibonacci</h4>
+                                <div class="text-[11px] text-gray-400 mb-2">Zone: <span class="text-amber-300 font-bold">${m.fib.zone}</span> · Range ₹${m.fib.lo} – ₹${m.fib.hi}</div>
+                                ${fibHtml}
+                                <div class="mt-2 pt-2 border-t border-gray-800 text-[11px] font-mono">
+                                    <div>Upside (127.2%): <span class="text-emerald-300">₹${m.fib.upside}</span></div>
+                                    <div>Downside (78.6%): <span class="text-red-300">₹${m.fib.downside}</span></div>
+                                </div>
+                            </div>
+                            <div class="bg-gray-900/60 border border-gray-800 rounded-lg p-3">
+                                <h4 class="text-[11px] font-bold text-indigo-300 uppercase tracking-wider mb-2">Support / Resistance</h4>
+                                ${srHtml}
+                                <div class="mt-2 pt-2 border-t border-gray-800 text-[11px] font-mono space-y-1">
+                                    <div>Breakout zone: <span class="text-emerald-300">₹${m.sr.breakoutZone ?? '—'}</span></div>
+                                    <div>Breakdown zone: <span class="text-red-300">₹${m.sr.breakdownZone ?? '—'}</span></div>
+                                    <div>Liquidity zone: <span class="text-sky-300">₹${m.sr.liquidityZone ?? '—'}</span></div>
+                                </div>
+                                <div class="mt-2 pt-2 border-t border-gray-800 text-[11px] font-mono space-y-1">
+                                    <h5 class="text-[10px] text-amber-300 uppercase">Fundamentals</h5>
+                                    <div>Turnover (avg 20d): ₹${m.fund.turnoverCr} Cr</div>
+                                    <div>Liquidity score: ${m.fund.liquidityScore}/100</div>
+                                    <div>Capital flow score: ${m.fund.capitalFlowScore}/100</div>
+                                    <div>Institutional score: ${m.fund.institutionalScore}/100</div>
+                                    <div>Market structure: ${m.fund.structureScore}/100</div>
+                                    <div class="font-bold">Overall fundamental: <span class="text-indigo-300">${m.fund.overall}/100</span></div>
+                                </div>
+                                <div class="mt-2 pt-2 border-t border-gray-800 text-[11px] font-mono space-y-1">
+                                    <h5 class="text-[10px] text-amber-300 uppercase">Trade Plan</h5>
+                                    <div>Entry ₹${m.trade.entry.toFixed(2)} · SL ₹${m.trade.sl} · R:R ${m.trade.rr}</div>
+                                    <div>T1 ₹${m.trade.t1} · T2 ₹${m.trade.t2} · T3 ₹${m.trade.t3}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </td>`;
+                body.appendChild(det);
+            });
+
+            filterMasterSwings();
+            safeCreateIcons();
+        }
+
+        // Add helper: route Master Swings -> My Picks
+        async function addToMyPicksFromMaster(ticker) {
+            mySwingSelectedTicker = ticker;
+            const input = document.getElementById('myswing-search');
+            if (input) input.value = ticker;
+            await mySwingAddStock();
+            switchTab('cards');
+        }
+
+        // Add helper: route Master Swings Pick button -> Sandbox Trading
+        async function addToSandboxFromMaster(ticker) {
+            await allocateFromScan(ticker);
+            // allocateFromScan already calls switchTab('virtual') on success
+        }
+
+
+        function filterMasterSwings() {
+            const search    = (document.getElementById('msSearchStock')?.value || '').toUpperCase();
+            const actFilter = document.getElementById('msFilterAction')?.value || 'ALL';
+            const setupFilter = document.getElementById('msFilterSetup')?.value || 'ALL';
+            const rows      = document.querySelectorAll('.ms-row');
+            let count = 0;
+
+            rows.forEach(row => {
+                const matchSearch = row.dataset.ticker.includes(search) || row.dataset.pattern.includes(search.toLowerCase());
+                const matchAction = actFilter === 'ALL' || row.dataset.action === actFilter;
+                const matchSetup  = setupFilter === 'ALL' || row.dataset.setup === setupFilter;
+
+                if (matchSearch && matchAction && matchSetup) {
+                    row.classList.remove('hidden');
+                    count++;
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+
+            const el = document.getElementById('msVisibleCount');
+            if (el) el.innerText = count;
+        }
+
+        // --- 10. MY SWING — INDIAN STOCK TRACKER ---
+
+        // Full NSE ticker universe for search suggestions
+        const MY_SWING_UNIVERSE = [
+            "RELIANCE","TCS","HDFCBANK","INFY","ICICIBANK","BHARTIARTL","SBIN","LICI","ITC","HINDUNILVR",
+            "LT","BAJFINANCE","HCLTECH","MARUTI","SUNPHARMA","ADANIENT","KOTAKBANK","TITAN","AXISBANK","ONGC",
+            "NTPC","TATAMOTORS","ULTRACEMCO","COALINDIA","ASIANPAINT","POWERGRID","ADANIGREEN","ADANIPORTS","BAJAJFSV","TATASTEEL",
+            "M&M","INDUSINDBK","JIOFIN","HINDALCO","JSWSTEEL","DLF","GRASIM","TECHM","SBILIFE","BPCL",
+            "BAJAJ-AUTO","CIPLA","EICHERMOT","WIPRO","BRITANNIA","NESTLEIND","HAL","BEL","ADANIPOWER","TATACONSUM",
+            "VBL","ZOMATO","CHOLAFIN","GAIL","DIVISLAB","HINDZINC","IOC","GODREJPROP","PRESTIGE","TRENT",
+            "SIEMENS","ABB","PFC","RECL","PIDILITIND","APOLLOHOSP","SHRIRAMFIN","HAVELLS","HEROMOTOCO","DRREDDY",
+            "LTIM","PNB","UNIONBANK","CANBK","BANKBARODA","IDBI","JSL","GMRINFRA","TATAELXSI","MPHASIS",
+            "IRFC","IRCTC","LODHA","NYKAA","PAYTM","DMART","MOTHERSON","POLYCAB","KPITTECH","PERSISTENT",
+            "COFORGE","LTTS","OFSS","MANAPPURAM","MUTHOOTFIN","AUBANK","BANDHANBNK","FEDERALBNK","RBLBANK","IDFCFIRSTB",
+            "PIIND","AARTIIND","DEEPAKNITR","SRF","ALKYLAMINE","NAVINFLUOR","TATACHEM","PIDILITIND","VINATI","ATUL",
+            "ESCORTS","ASHOKLEY","BHARATFORG","CUMMINSIND","TIINDIA","CRAFTSMAN","ASTRAL","WHIRLPOOL","VOLTAS","BLUESTAR",
+            "JUBLFOOD","WESTLIFE","DEVYANI","SAPPHIRE","BARBEQUE","VARUNBEV","HATSUN","PGHH","MARICO","DABUR",
+            "EMAMILTD","GODREJCP","JYOTHYLAB","COLPAL","GILLETTE","HONAUT","BOSCHLTD","3MINDIA","ABBOTINDIA","PFIZER",
+            "SANOFI","ALKEM","TORNTPHARM","AUROPHARMA","LUPIN","BIOCON","GRANULES","LAURUSLABS","STRIDES","DIVI"
+        ];
+
+        let mySwingHoldings = JSON.parse(localStorage.getItem('myPicksHoldings') || localStorage.getItem('mySwingHoldings') || '[]');
+        let mySwingHistory  = JSON.parse(localStorage.getItem('myPicksTransactions') || localStorage.getItem('mySwingHistory') || '[]');
+        let mySwingSelectedTicker = '';
+
+        function mySwingSave() {
+            localStorage.setItem('mySwingHoldings', JSON.stringify(mySwingHoldings));
+            localStorage.setItem('mySwingHistory',  JSON.stringify(mySwingHistory));
+        }
+
+        function mySwingFilterSearch(val) {
+            const q = val.trim().toUpperCase();
+            const dd = document.getElementById('myswing-dropdown');
+            if (!q || q.length < 1) { dd.classList.add('hidden'); return; }
+            const matches = MY_SWING_UNIVERSE.filter(t => t.startsWith(q) || t.includes(q)).slice(0, 12);
+            if (matches.length === 0) { dd.classList.add('hidden'); return; }
+            dd.innerHTML = matches.map(t => `
+                <div class="px-4 py-2.5 cursor-pointer hover:bg-gray-800 text-sm text-gray-200 flex items-center justify-between group"
+                     onclick="mySwingSelectTicker('${t}')">
+                    <span class="font-bold">${t}</span>
+                    <span class="text-[10px] text-gray-500 group-hover:text-gray-400">.NS · NSE</span>
+                </div>
+            `).join('');
+            dd.classList.remove('hidden');
+        }
+
+        function mySwingSelectTicker(ticker) {
+            mySwingSelectedTicker = ticker;
+            document.getElementById('myswing-search').value = ticker;
+            document.getElementById('myswing-dropdown').classList.add('hidden');
+        }
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#myswing-search') && !e.target.closest('#myswing-dropdown')) {
+                const dd = document.getElementById('myswing-dropdown');
+                if (dd) dd.classList.add('hidden');
+            }
+        });
+
+        // Advanced multi-indicator analysis for a ticker using real OHLCV (or synthetic fallback)
+        function mySwingAnalyze(ticker) {
+            const hist = getOHLCV(ticker);
+            const closes = hist.map(d => d.close);
+            const highs   = hist.map(d => d.high);
+            const lows    = hist.map(d => d.low);
+            const volumes = hist.map(d => d.volume);
+            const n = hist.length - 1;
+
+            const ema9   = QuantMathEngine.EMA(closes, 9);
+            const ema21  = QuantMathEngine.EMA(closes, 21);
+            const ema50  = QuantMathEngine.EMA(closes, 50);
+            const ema200 = QuantMathEngine.EMA(closes, 200);
+            const rsi    = QuantMathEngine.RSI(closes, 14);
+            const macd   = QuantMathEngine.MACD(closes);
+            const atr    = QuantMathEngine.ATR(highs, lows, closes, 14);
+            const adx    = QuantMathEngine.ADX(highs, lows, closes, 14);
+
+            const price   = closes[n];
+            const curAtr  = atr[n] || price * 0.02;
+            const curRsi  = rsi[n];
+            const curAdx  = adx.adx[n];
+            const volRatio = volumes[n] / (volumes.slice(n-20, n).reduce((a,b)=>a+b,0)/20 || 1);
+
+            // Bollinger Bands (20,2)
+            const bbWindow = 20;
+            const bbMid = closes.slice(n - bbWindow + 1, n + 1).reduce((a,b)=>a+b,0)/bbWindow;
+            const bbStd  = Math.sqrt(closes.slice(n - bbWindow + 1, n + 1).reduce((a,b)=>a+(b-bbMid)**2,0)/bbWindow);
+            const bbUpper = bbMid + 2*bbStd;
+            const bbLower = bbMid - 2*bbStd;
+
+            // Pattern detection (enhanced)
+            let patterns = [];
+            const c0 = hist[n], c1 = hist[n-1], c2 = hist[n-2];
+            // Bullish engulfing
+            if (c1.close < c1.open && c0.close > c0.open && c0.close > c1.open && c0.open < c1.close) patterns.push('Bullish Engulfing');
+            // Hammer
+            const body0 = Math.abs(c0.close - c0.open);
+            const lShadow = Math.min(c0.open, c0.close) - c0.low;
+            const uShadow = c0.high - Math.max(c0.open, c0.close);
+            if (lShadow > body0 * 2 && uShadow < body0 * 0.5 && c0.close > c0.open) patterns.push('Hammer (Reversal)');
+            // Morning star
+            if (c2.close < c2.open && Math.abs(c1.close - c1.open) < curAtr * 0.4 && c0.close > c0.open && c0.close > (c2.close + c2.open)/2) patterns.push('Morning Star');
+            // Flat base breakout
+            if (c0.close > c1.high && volRatio > 1.8) patterns.push('Flat Base Breakout');
+            // EMA crossover
+            if (ema9[n] > ema21[n] && ema9[n-1] <= ema21[n-1]) patterns.push('EMA 9/21 Crossover');
+            // MACD crossover
+            if (macd.hist[n] > 0 && macd.hist[n-1] <= 0) patterns.push('MACD Bullish Cross');
+            // Inside bar breakout
+            if (c1.high > c2.high && c1.low > c2.low && c0.close > c1.high) patterns.push('Inside Bar Breakout');
+            // BB squeeze breakout
+            if (c0.close > bbUpper && volRatio > 1.5) patterns.push('BB Upper Band Breakout');
+            if (patterns.length === 0) patterns.push('EMA Bounce');
+
+            // Signal strength score
+            let score = 0;
+            if (price > ema9[n] && ema9[n] > ema21[n] && ema21[n] > ema50[n] && ema50[n] > ema200[n]) score += 30;
+            else if (price > ema21[n] && ema21[n] > ema50[n]) score += 18;
+            if (curRsi >= 40 && curRsi <= 72) score += 15;
+            if (macd.hist[n] > 0 && macd.hist[n-1] <= 0) score += 15;
+            else if (macd.hist[n] > 0) score += 8;
+            if (volRatio > 1.5) score += 12;
+            if (curAdx > 25 && adx.plusDI[n] > adx.minusDI[n]) score += 10;
+            if (c0.close > bbMid) score += 5;
+            if (patterns.length > 1) score += 5;
+
+            // ATR-based trade plan
+            const sl  = price - 1.5 * curAtr;
+            const t1  = price + 1.5 * curAtr;
+            const t2  = price + 3.0 * curAtr;
+            const t3  = price + 5.0 * curAtr;
+
+            return {
+                ticker, price,
+                score: Math.min(score, 100),
+                rsi: curRsi, adx: curAdx, volRatio,
+                atr: curAtr,
+                ema9: ema9[n], ema21: ema21[n], ema50: ema50[n], ema200: ema200[n],
+                bbUpper, bbLower, bbMid,
+                patterns,
+                sl, t1, t2, t3
+            };
+        }
+
+        async function mySwingAddStock() {
+            const input = document.getElementById('myswing-search').value.trim().toUpperCase();
+            const ticker = mySwingSelectedTicker || input;
+            if (!ticker) { alert('Please enter or select a stock ticker first.'); return; }
+            if (mySwingHoldings.some(h => h.ticker === ticker)) {
+                alert(`${ticker} is already in your My Picks list.`); return;
+            }
+
+            // Show loading state
+            const btn = document.querySelector('[onclick="mySwingAddStock()"]');
+            if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+
+            // Fetch real OHLCV first (this also populates liveNSEPrices as a side effect)
+            const realOHLCV = await _fetchRealOHLCV(ticker);
+
+            // Analyze using real data if available
+            const analysis = mySwingAnalyze(ticker);
+
+            // Use live price from cache (set by _fetchRealOHLCV) or fallback
+            const livePrice = liveNSEPrices[ticker] || null;
+            const avgPrice = livePrice || analysis.price;
+
+            // Recalculate ATR-based levels from the real ATR on the real avg price
+            const atrVal = analysis.atr || (avgPrice * 0.02);
+            mySwingHoldings.push({
+                ticker,
+                avgPrice,
+                qty: 10,
+                ltp: avgPrice,
+                isLive: !!livePrice,
+                isRealOHLCV: !!realOHLCV,
+                sl:  parseFloat((avgPrice - 1.5 * atrVal).toFixed(2)),
+                t1:  parseFloat((avgPrice + 1.5 * atrVal).toFixed(2)),
+                t2:  parseFloat((avgPrice + 3.0 * atrVal).toFixed(2)),
+                t3:  parseFloat((avgPrice + 5.0 * atrVal).toFixed(2)),
+                patterns: analysis.patterns,
+                score: analysis.score,
+                rsi: analysis.rsi,
+                adx: analysis.adx,
+                atr: atrVal,
+                addedAt: new Date().toISOString()
+            });
+            mySwingSave();
+            document.getElementById('myswing-search').value = '';
+            mySwingSelectedTicker = '';
+            if (btn) { btn.disabled = false; btn.innerHTML = SVG.plus + ' Add Stock'; }
+            mySwingRender();
+        }
+
+        async function mySwingRefreshPrices() {
+            if (mySwingHoldings.length === 0) { alert('No stocks added yet.'); return; }
+            const btn = document.getElementById('myswing-refresh-btn');
+            const statusEl = document.getElementById('myswing-status');
+            const dot = document.getElementById('myswing-status-dot');
+            const txt = document.getElementById('myswing-status-text');
+            btn.disabled = true;
+            statusEl.classList.remove('hidden');
+            statusEl.style.display = 'flex';
+            dot.className = 'w-1.5 h-1.5 rounded-full bg-yellow-400 inline-block flex-shrink-0 animate-pulse';
+            txt.className = 'text-yellow-300'; txt.textContent = 'Fetching…';
+
+            let fetched = 0;
+            for (let i = 0; i < mySwingHoldings.length; i++) {
+                const h = mySwingHoldings[i];
+                txt.textContent = `Fetching ${i+1}/${mySwingHoldings.length}: ${h.ticker}…`;
+                try {
+                    const r = await _fetchSingleNSEPrice(h.ticker);
+                    if (r && r.price > 0) { h.ltp = r.price; h.isLive = true; fetched++; }
+                } catch(_) {}
+                if (i < mySwingHoldings.length - 1) await new Promise(r => setTimeout(r, 120));
+            }
+
+            dot.className = `w-1.5 h-1.5 rounded-full ${fetched > 0 ? 'bg-emerald-400':'bg-red-400'} inline-block flex-shrink-0`;
+            txt.className = fetched > 0 ? 'text-emerald-400' : 'text-yellow-400';
+            txt.textContent = fetched > 0
+                ? `${fetched}/${mySwingHoldings.length} updated · ${new Date().toLocaleTimeString('en-IN')}`
+                : '⚠ Failed — showing simulated prices';
+            btn.disabled = false;
+            mySwingSave();
+            mySwingRender();
+        }
+
+        function mySwingUpdateQty(idx, val) {
+            const q = parseInt(val);
+            if (!isNaN(q) && q > 0) { mySwingHoldings[idx].qty = q; mySwingSave(); mySwingRender(); }
+        }
+
+        function mySwingUpdateAvg(idx, val) {
+            const p = parseFloat(val);
+            if (!isNaN(p) && p > 0) {
+                mySwingHoldings[idx].avgPrice = p;
+                // Use stored real ATR if available, else recalculate from live OHLCV
+                const atr = mySwingHoldings[idx].atr || (mySwingHoldings[idx].ltp * 0.02);
+                mySwingHoldings[idx].sl = parseFloat((p - 1.5 * atr).toFixed(2));
+                mySwingHoldings[idx].t1 = parseFloat((p + 1.5 * atr).toFixed(2));
+                mySwingHoldings[idx].t2 = parseFloat((p + 3.0 * atr).toFixed(2));
+                mySwingHoldings[idx].t3 = parseFloat((p + 5.0 * atr).toFixed(2));
+                mySwingSave(); mySwingRender();
+            }
+        }
+
+        function mySwingSellStock(idx) {
+            const h = mySwingHoldings[idx];
+            const sellPrice = h.ltp || h.avgPrice;
+            const pl = (sellPrice - h.avgPrice) * h.qty;
+            mySwingHistory.unshift({
+                ticker: h.ticker, avgPrice: h.avgPrice, qty: h.qty,
+                sellPrice, pl, date: new Date().toLocaleDateString('en-IN')
+            });
+            mySwingHoldings.splice(idx, 1);
+            mySwingSave();
+            mySwingRender();
+        }
+
+        function mySwingRemoveStock(idx) {
+            mySwingHoldings.splice(idx, 1);
+            mySwingSave();
+            mySwingRender();
+        }
+
+        function mySwingClearHistory() {
+            if (confirm('Clear all sell history?')) { mySwingHistory = []; mySwingSave(); mySwingRender(); }
+        }
+
+        function mySwingExport() {
+            const data = { holdings: mySwingHoldings, history: mySwingHistory, exportedAt: new Date().toISOString() };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href     = url;
+            a.download = `myswing_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function mySwingImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data.holdings || !Array.isArray(data.holdings)) { alert('Invalid file — missing holdings array.'); return; }
+                    if (confirm(`Import ${data.holdings.length} holdings and ${(data.history||[]).length} history records? This will REPLACE your current data.`)) {
+                        mySwingHoldings = data.holdings;
+                        mySwingHistory  = data.history || [];
+                        mySwingSave();
+                        mySwingRender();
+                    }
+                } catch(err) {
+                    alert('Failed to parse JSON file: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // reset so same file can be re-imported
+        }
+
+        function mySwingRender() {
+            const body = document.getElementById('myswing-table-body');
+            const histSection = document.getElementById('myswing-history-section');
+            const histBody = document.getElementById('myswing-history-body');
+            const focusedId = document.activeElement?.id || null;
+            const selStart  = document.activeElement?.selectionStart ?? null;
+
+            body.innerHTML = '';
+            let totalInvested = 0, totalCurrent = 0, totalPl = 0;
+
+            if (mySwingHoldings.length === 0) {
+                body.innerHTML = `<tr id="myswing-empty-row">
+                    <td colspan="11" class="text-center py-14 text-gray-500">
+                        <i data-lucide="flame" class="w-9 h-9 mx-auto mb-3 opacity-30"></i>
+                        <p class="font-medium">No picks yet.</p>
+                        <p class="text-xs mt-1 text-gray-600">Search and add an Indian stock above to start tracking.</p>
+                    </td></tr>`;
+            } else {
+                mySwingHoldings.forEach((h, idx) => {
+                    const ltp = h.ltp || h.avgPrice;
+                    const invested = h.avgPrice * h.qty;
+                    const current  = ltp * h.qty;
+                    const pl       = current - invested;
+                    const plPct    = invested > 0 ? (pl / invested * 100) : 0;
+                    totalInvested += invested;
+                    totalCurrent  += current;
+                    totalPl       += pl;
+
+                    const plColor   = pl >= 0 ? 'text-emerald-400' : 'text-red-400';
+                    const rowAlert  = ltp <= h.sl ? 'bg-red-950/20' : (ltp >= h.t2 ? 'bg-emerald-950/10' : '');
+                    const liveTag   = h.isLive
+                        ? `<span class="text-[9px] px-1 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30 font-bold">LIVE</span>`
+                        : `<span class="text-[9px] px-1 py-0.5 rounded bg-yellow-500/10 text-yellow-500/70 border border-yellow-500/20 font-bold">SIM</span>`;
+                    const dataTag   = (h.isRealOHLCV || isRealData(h.ticker))
+                        ? `<span class="text-[9px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">REAL</span>`
+                        : `<span class="text-[9px] px-1 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20 font-bold">SYNTH</span>`;
+
+                    let statusBadge = '';
+                    if (ltp <= h.sl) statusBadge = `<span class="block mt-0.5 text-[10px] font-bold text-red-400 animate-pulse">⚠ SL HIT</span>`;
+                    else if (ltp >= h.t3) statusBadge = `<span class="block mt-0.5 text-[10px] font-bold text-blue-400">T3 REACHED</span>`;
+                    else if (ltp >= h.t2) statusBadge = `<span class="block mt-0.5 text-[10px] font-bold text-emerald-400">T2 REACHED</span>`;
+                    else if (ltp >= h.t1) statusBadge = `<span class="block mt-0.5 text-[10px] font-bold text-teal-400">T1 REACHED</span>`;
+
+                    const patternHtml = h.patterns.slice(0, 2).map(p =>
+                        `<span class="inline-block text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 mr-0.5 mb-0.5">${p}</span>`
+                    ).join('');
+
+                    const scoreColor = h.score >= 75 ? 'text-emerald-400' : h.score >= 50 ? 'text-amber-400' : 'text-gray-400';
+
+                    const tr = document.createElement('tr');
+                    tr.className = `hover:bg-gray-900/40 border-b border-gray-800/60 text-gray-300 transition ${rowAlert}`;
+                    tr.innerHTML = `
+                        <td class="p-4">
+                            <span class="font-bold text-white text-sm cursor-pointer hover:text-indigo-400 transition" onclick="routeToAnalytics('${h.ticker}')">${h.ticker}</span>
+                            <span class="text-[10px] text-gray-500 block">.NS · NSE</span>
+                            <span class="${scoreColor} text-[10px] font-mono font-bold">Score: ${h.score}</span>
+                        </td>
+                        <td class="p-4">
+                            <input type="number" step="0.01" id="ms-avg-${idx}" value="${h.avgPrice.toFixed(2)}"
+                                onchange="mySwingUpdateAvg(${idx}, this.value)"
+                                class="w-24 bg-gray-950 border border-gray-700 focus:border-indigo-500 rounded px-2 py-1 text-xs font-mono font-bold text-white focus:outline-none">
+                        </td>
+                        <td class="p-4">
+                            <input type="number" min="1" id="ms-qty-${idx}" value="${h.qty}"
+                                onchange="mySwingUpdateQty(${idx}, this.value)"
+                                class="w-20 bg-gray-950 border border-gray-700 focus:border-indigo-500 rounded px-2 py-1 text-xs font-mono font-bold text-white focus:outline-none">
+                        </td>
+                        <td class="p-4 font-mono text-sm">
+                            <div class="flex items-center gap-1.5">₹${ltp.toFixed(2)} ${liveTag} ${dataTag}</div>
+                            ${statusBadge}
+                        </td>
+                        <td class="p-4 text-xs leading-relaxed">${patternHtml}
+                            <span class="block text-[10px] text-gray-600 mt-0.5 font-mono">RSI ${h.rsi?.toFixed(1)||'--'} · ADX ${h.adx?.toFixed(1)||'--'} · ATR ₹${h.atr?.toFixed(2)||'--'}</span>
+                        </td>
+                        <td class="p-4 font-mono text-xs font-bold text-red-400">₹${h.sl.toFixed(2)}</td>
+                        <td class="p-4 font-mono text-xs font-bold text-emerald-400">₹${h.t1.toFixed(2)}</td>
+                        <td class="p-4 font-mono text-xs font-bold text-emerald-300">₹${h.t2.toFixed(2)}</td>
+                        <td class="p-4 font-mono text-xs font-bold text-blue-400">₹${h.t3.toFixed(2)}</td>
+                        <td class="p-4">
+                            <span class="font-bold font-mono text-sm ${plColor}">₹${pl.toFixed(2)}</span>
+                            <span class="block text-[10px] ${plColor} opacity-70">${plPct.toFixed(2)}%</span>
+                            <span class="block text-[10px] text-gray-600 font-mono">Val: ₹${current.toFixed(0)}</span>
+                        </td>
+                        <td class="p-4 text-right whitespace-nowrap space-x-1">
+                            <a href="https://www.tradingview.com/chart/?symbol=NSE%3A${h.ticker}" target="_blank" rel="noopener noreferrer"
+                                class="inline-flex items-center justify-center p-1.5 bg-sky-800/40 hover:bg-sky-700 border border-sky-600/30 hover:border-sky-500 text-sky-400 hover:text-white rounded-lg transition cursor-pointer" title="View on TradingView">
+                                ${SVG.barChart}
+                            </a>
+                            <button onclick="mySwingSellStock(${idx})"
+                                class="text-xs font-semibold bg-amber-600/20 hover:bg-amber-600 border border-amber-500/30 hover:border-amber-500 text-amber-400 hover:text-white px-2.5 py-1.5 rounded-lg transition cursor-pointer">
+                                Sell
+                            </button>
+                            <button onclick="mySwingRemoveStock(${idx})"
+                                class="inline-flex items-center justify-center p-1.5 bg-gray-800 hover:bg-red-900/40 hover:text-red-400 rounded-lg transition text-gray-500 cursor-pointer" title="Remove">
+                                ${SVG.trash}
+                            </button>
+                        </td>
+                    `;
+                    body.appendChild(tr);
+                });
+            }
+
+            // Update summary
+            document.getElementById('mswing-invested').textContent = `₹${totalInvested.toLocaleString('en-IN', {maximumFractionDigits:0})}`;
+            document.getElementById('mswing-current').textContent  = `₹${totalCurrent.toLocaleString('en-IN', {maximumFractionDigits:0})}`;
+            const plEl = document.getElementById('mswing-pnl');
+            plEl.textContent = `₹${totalPl.toLocaleString('en-IN', {maximumFractionDigits:0})}`;
+            plEl.className = `text-base font-bold font-mono ${totalPl >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+            document.getElementById('mswing-count').textContent = mySwingHoldings.length;
+
+            // Sell history
+            if (mySwingHistory.length > 0) {
+                histSection.classList.remove('hidden');
+                histBody.innerHTML = mySwingHistory.map(h => {
+                    const plColor = h.pl >= 0 ? 'text-emerald-400' : 'text-red-400';
+                    return `<tr class="border-b border-gray-800/40 hover:bg-gray-900/30 text-gray-300">
+                        <td class="p-3 font-bold text-white text-sm">${h.ticker}</td>
+                        <td class="p-3 font-mono text-xs">₹${h.avgPrice.toFixed(2)}</td>
+                        <td class="p-3 font-mono text-xs">${h.qty}</td>
+                        <td class="p-3 font-mono text-xs">₹${h.sellPrice.toFixed(2)}</td>
+                        <td class="p-3 font-mono font-bold text-sm ${plColor}">₹${h.pl.toFixed(2)}</td>
+                        <td class="p-3 text-xs text-gray-500">${h.date}</td>
+                    </tr>`;
+                }).join('');
+            } else {
+                histSection.classList.add('hidden');
+            }
+
+            safeCreateIcons();
+
+            // Restore focus
+            if (focusedId) {
+                const el = document.getElementById(focusedId);
+                if (el) { el.focus(); if (selStart !== null) try { el.setSelectionRange(selStart, selStart); } catch(_){} }
+            }
+        }
+
+        // Keep legacy populateCards as no-op since cardsContainer no longer exists
+        function populateCards() { mySwingRender(); }
+
+        // --- 11. DEEP DIVE ANALYTICS SUB-SYSTEM (FIXED INTEGRATION) ---
+        function initializeAnalyticsDropdown() {
+            // Analytics dropdown removed — analytics now inline in Master Swings via routeToAnalytics()
+            if (NIFTY_200_TICKERS.length > 0 && globalScanDataset[NIFTY_200_TICKERS[0]]) {
+                // Pre-load first ticker silently so panel is ready when opened
+            }
+        }
+
+        function routeToAnalytics(ticker) {
+            loadStockAnalytics(ticker);
+            // Show inline analytics panel inside Master Swings and scroll to it
+            switchTab('masterswings');
+            const panel = document.getElementById('ms-analytics-panel');
+            if (panel) {
+                panel.classList.remove('hidden');
+                setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+            }
+        }
+
+        function loadStockAnalytics(ticker) {
+            let stock = globalScanDataset[ticker];
+            if(!stock) return;
+
+            // Reveal inline analytics panel (if not already visible)
+            const panel = document.getElementById('ms-analytics-panel');
+            if (panel) panel.classList.remove('hidden');
+
+            document.getElementById('analyticsBigScore').innerText = stock.score;
+            document.getElementById('chartTickerLabel').innerText = `NSE: ${ticker}`;
+            document.getElementById('analyticsAtrValue').innerText = `₹${stock.targets.atr.toFixed(2)}`;
+            document.getElementById('analyticsSetupCount').innerText = `${stock.breakdown.length} Signals Valid`;
+            
+            let badge = document.getElementById('analyticsBadge');
+            badge.innerText = stock.action.toUpperCase();
+            badge.className = `py-2 px-4 rounded-xl text-sm font-bold tracking-wide max-w-[200px] mx-auto text-center ${stock.score >= 60 ? 'bg-emerald-500/20 text-emerald-400':'bg-gray-800 text-gray-400'}`;
+
+            renderInstitutionalChart(stock);
+
+            const grid = document.getElementById('analyticsExplainerGrid');
+            grid.innerHTML = "";
+            stock.breakdown.forEach(signal => {
+                let card = document.createElement('div');
+                card.className = "bg-gray-900 border border-gray-800 p-2.5 rounded-lg flex items-center justify-between";
+                card.innerHTML = `
+                    <div>
+                        <p class="text-xs font-bold text-white">${signal.name}</p>
+                        <span class="text-[11px] text-gray-500 font-mono">Value Verified: ${signal.val}</span>
+                    </div>
+                    <span class="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">+${signal.points} pts</span>
+                `;
+                grid.appendChild(card);
+            });
+            safeCreateIcons();
+        }
+        function renderInstitutionalChart(stock) {
+            const frameContainer = document.getElementById('chartTargetFrame');
+            const data = stock.raw || [];
+            if(!data.length) {
+                frameContainer.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">No pricing data available for ${stock.ticker}</div>`;
+                return;
+            }
+            const closes = data.map(d => d.close);
+            const highs = data.map(d => d.high);
+            const lows = data.map(d => d.low);
+            const ema20 = QuantMathEngine.EMA(closes, 20);
+            const ema50 = QuantMathEngine.EMA(closes, 50);
+            const width = 900, height = 360, chartTop = 20, chartBottom = 275, chartLeft = 52, chartRight = 20;
+            const volTop = 290, volBottom = 338;
+            const chartWidth = width - chartLeft - chartRight;
+            const chartHeight = chartBottom - chartTop;
+            const priceMax = Math.max(...highs) * 1.01;
+            const priceMin = Math.min(...lows) * 0.99;
+            const y = (v) => chartBottom - ((v - priceMin) / (priceMax - priceMin || 1)) * chartHeight;
+            const x = (i) => chartLeft + (i / Math.max(data.length - 1, 1)) * chartWidth;
+            const volumes = data.map(d => d.volume);
+            const volMax = Math.max(...volumes, 1);
+            const volHeight = volBottom - volTop;
+            const volY = (v) => volBottom - (v / volMax) * volHeight;
+            let grid = '';
+            for(let i = 0; i < 5; i++) {
+                const gy = chartTop + (i / 4) * chartHeight;
+                const val = (priceMax - (i / 4) * (priceMax - priceMin)).toFixed(0);
+                grid += `<line x1="${chartLeft}" y1="${gy}" x2="${width-chartRight}" y2="${gy}" />`;
+                grid += `<text x="8" y="${gy+4}" fill="#94a3b8" font-size="11">₹${val}</text>`;
+            }
+            let candles = '';
+            const candleWidth = Math.max(4, chartWidth / data.length * 0.62);
+            data.forEach((d, i) => {
+                const cx = x(i);
+                const openY = y(d.open); const closeY = y(d.close);
+                const highY = y(d.high); const lowY = y(d.low);
+                const top = Math.min(openY, closeY); const bottom = Math.max(openY, closeY);
+                const color = d.close >= d.open ? '#10b981' : '#ef4444';
+                candles += `<line x1="${cx}" y1="${highY}" x2="${cx}" y2="${lowY}" stroke="${color}" stroke-width="1.5" />`;
+                candles += `<rect x="${cx - candleWidth/2}" y="${top}" width="${candleWidth}" height="${Math.max(bottom-top, 1.8)}" rx="1.3" fill="${color}" fill-opacity="0.85" />`;
+            });
+            const linePath = (arr, color) => {
+                let pts = arr.map((v, i) => v ? `${i===0?'M':'L'} ${x(i)} ${y(v)}` : '').join(' ');
+                return `<path d="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />`;
+            };
+            let volBars = '';
+            data.forEach((d, i) => {
+                const vx = x(i);
+                const color = d.close >= d.open ? 'rgba(16,185,129,0.45)' : 'rgba(239,68,68,0.45)';
+                volBars += `<rect x="${vx - candleWidth/2}" y="${volY(d.volume)}" width="${candleWidth}" height="${Math.max(volBottom - volY(d.volume), 1)}" fill="${color}" rx="1" />`;
+            });
+            const firstDate = new Date(data[0].date).toLocaleDateString('en-IN', { day:'2-digit', month:'short' });
+            const lastDate = new Date(data[data.length-1].date).toLocaleDateString('en-IN', { day:'2-digit', month:'short' });
+            frameContainer.innerHTML = `
+                <svg viewBox="0 0 ${width} ${height}" class="w-full h-full bg-[#020617]">
+                    <rect x="0" y="0" width="${width}" height="${height}" fill="#020617" />
+                    <g class="chart-grid">${grid}</g>
+                    <g>${candles}</g>
+                    ${linePath(ema20, '#60a5fa')}
+                    ${linePath(ema50, '#f59e0b')}
+                    <line x1="${chartLeft}" y1="${volTop}" x2="${width-chartRight}" y2="${volTop}" stroke="rgba(148,163,184,0.12)" />
+                    <g>${volBars}</g>
+                    <text x="${chartLeft}" y="${height-8}" fill="#94a3b8" font-size="11">${firstDate}</text>
+                    <text x="${width-chartRight-52}" y="${height-8}" fill="#94a3b8" font-size="11">${lastDate}</text>
+                    <text x="${chartLeft}" y="14" fill="#e5e7eb" font-size="13" font-weight="700">${stock.ticker} · ${isRealData(stock.ticker) ? 'Real NSE Daily OHLCV (Yahoo Finance)' : 'Synthetic Data — Real OHLCV not yet loaded'}</text>
+                    <g transform="translate(${width-250}, 20)">
+                        <rect x="0" y="0" width="220" height="44" rx="10" fill="rgba(17,24,39,0.78)" stroke="rgba(55,65,81,0.9)" />
+                        <circle cx="18" cy="14" r="4.5" fill="#60a5fa" /><text x="30" y="18" fill="#e5e7eb" font-size="11">EMA 20</text>
+                        <circle cx="18" cy="30" r="4.5" fill="#f59e0b" /><text x="30" y="34" fill="#e5e7eb" font-size="11">EMA 50</text>
+                        <text x="118" y="18" fill="#94a3b8" font-size="11">LTP</text><text x="145" y="18" fill="#f8fafc" font-size="11" font-weight="700">₹${stock.price.toFixed(2)}</text>
+                        <text x="118" y="34" fill="#94a3b8" font-size="11">Action</text><text x="160" y="34" fill="#34d399" font-size="11" font-weight="700">${stock.action}</text>
+                    </g>
+                </svg>
+            `;
+        }
+
+        // --- 12. VIRTUAL PORTFOLIO LEDGER SYSTEM (WITH INLINE QUANTITY EDIT FIX) ---
+        function openManualTradeModal() { document.getElementById('manualTradeModal').classList.remove('hidden'); }
+        function closeManualTradeModal() {
+            document.getElementById('manualTradeModal').classList.add('hidden');
+            document.getElementById('manualTradeForm').reset();
+        }
+
+        async function allocateFromScan(ticker) {
+            let stock = globalScanDataset[ticker];
+            if(!stock) return;
+
+            if(activeVirtualPortfolio.some(p => p.ticker === ticker)) {
+                alert("Asset package is already tracked within current virtual sandbox context.");
+                return;
+            }
+
+            // Use live price if already cached, otherwise fetch it now
+            let entryPrice = liveNSEPrices[ticker] || null;
+            if (!entryPrice) {
+                try {
+                    const result = await _fetchSingleNSEPrice(ticker);
+                    if (result && result.price > 0) {
+                        liveNSEPrices[ticker] = result.price;
+                        if (globalScanDataset[ticker]) globalScanDataset[ticker].price = result.price;
+                        entryPrice = result.price;
+                    }
+                } catch(_) {}
+            }
+
+            // Fall back to simulated price if live fetch failed
+            if (!entryPrice) entryPrice = stock.targets.entryZone;
+
+            // Recalculate SL / T1 / T2 relative to the real entry price
+            const atr = stock.targets.atr || (entryPrice * 0.02);
+            const sl  = entryPrice - 1.5 * atr;
+            const t1  = entryPrice + 1.5 * atr;
+            const t2  = entryPrice + 3.0 * atr;
+
+            activeVirtualPortfolio.push({
+                ticker: stock.ticker,
+                entryPrice,
+                qty: 100,
+                sl, t1, t2,
+                status: "Active",
+                exitPrice: null
+            });
+            switchTab('virtual');
+            renderVirtualPortfolio();
+            const stateEl = document.getElementById('portfolioSyncState');
+            if(stateEl) stateEl.innerText = `Added ${ticker} · entry ₹${entryPrice.toFixed(2)} ${liveNSEPrices[ticker] ? '(live)' : '(simulated)'}`;
+        }
+
+        function handleManualTradeSubmit(e) {
+            e.preventDefault();
+            let ticker = document.getElementById('mTicker').value.toUpperCase().trim();
+            let entryPrice = parseFloat(document.getElementById('mPrice').value);
+            let qty = parseInt(document.getElementById('mQty').value);
+            let sl = parseFloat(document.getElementById('mSl').value);
+            let t1 = parseFloat(document.getElementById('mT1').value);
+            let t2 = parseFloat(document.getElementById('mT2').value);
+
+            activeVirtualPortfolio.push({ ticker, entryPrice, qty, sl, t1, t2, status: "Active", exitPrice: null });
+            closeManualTradeModal();
+            document.getElementById('manualTradeForm').reset();
+            renderVirtualPortfolio();
+            const stateEl = document.getElementById('portfolioSyncState');
+            if(stateEl) stateEl.innerText = `Manual position committed for ${ticker}`;
+        }
+
+        // FEATURE: Dynamic Inline Quantity Modifier
+        function updateVirtualPositionQty(index, newQty) {
+            let parsedQty = parseInt(newQty);
+            if(isNaN(parsedQty) || parsedQty <= 0) {
+                parsedQty = 1; // Safeguard configuration fallback bounds
+            }
+            activeVirtualPortfolio[index].qty = parsedQty;
+            
+            // Recalculate metrics on the fly without refreshing standard views
+            renderVirtualPortfolio();
+            const stateEl = document.getElementById('portfolioSyncState');
+            if(stateEl) stateEl.innerText = 'Position quantity updated';
+        }
+
+        function removeVirtualPosition(index) {
+            activeVirtualPortfolio.splice(index, 1);
+            renderVirtualPortfolio();
+            const stateEl = document.getElementById('portfolioSyncState');
+            if(stateEl) stateEl.innerText = 'Position removed from virtual book';
+        }
+
+        function sellVirtualPosition(index, currentExitPrice) {
+            if (index < 0 || index >= activeVirtualPortfolio.length) return;
+            
+            activeVirtualPortfolio[index].status = "Sold";
+            activeVirtualPortfolio[index].exitPrice = Number(currentExitPrice);
+            
+            renderVirtualPortfolio();
+            
+            const stateEl = document.getElementById('portfolioSyncState');
+            if(stateEl) stateEl.innerText = `Position ${activeVirtualPortfolio[index].ticker} marked sold at ₹${currentExitPrice.toFixed(2)}`;
+        }
+
+        function renderVirtualPortfolio() {
+            const body = document.getElementById('virtualTableBody');
+            
+            // Retain focused layout reference states during manual composition edits
+            const currentFocusedElementId = document.activeElement ? document.activeElement.id : null;
+            const selectionStart = document.activeElement ? document.activeElement.selectionStart : null;
+
+            body.innerHTML = "";
+
+            if(activeVirtualPortfolio.length === 0) {
+                body.innerHTML = `<tr><td colspan="7" class="text-center py-12 text-gray-500">Virtual Portfolio Ledger Empty.</td></tr>`;
+                updatePortfolioMetrics(0, 0, 0);
+                capturePortfolioSnapshot(0, 0, 0);
+                updateTradingGradeAnalytics([]);
+                savePortfolioState();
+                return;
+            }
+
+            let totalAllocated = 0;
+            let totalCurrent = 0;
+            let totalPl = 0;
+
+            activeVirtualPortfolio.forEach((pos, idx) => {
+                if (!pos.status) pos.status = "Active";
+                
+                let currentPrice;
+                let isSold = pos.status === "Sold";
+
+                if (isSold) {
+                    currentPrice = pos.exitPrice || pos.entryPrice;
+                } else if (liveNSEPrices[pos.ticker]) {
+                    currentPrice = liveNSEPrices[pos.ticker];
+                } else if (globalScanDataset[pos.ticker]) {
+                    const simData = globalScanDataset[pos.ticker];
+                    const simCurrentPrice = simData.price;
+                    const simRaw = simData.raw;
+                    const simBasePrice = simRaw && simRaw.length > 0 ? simRaw[0].open : simCurrentPrice;
+                    const simChangePct = simBasePrice > 0 ? (simCurrentPrice - simBasePrice) / simBasePrice : 0;
+                    currentPrice = pos.entryPrice * (1 + simChangePct);
+                } else {
+                    currentPrice = pos.entryPrice;
+                }
+                
+                let costBasis = pos.entryPrice * pos.qty;
+                let marketValue = currentPrice * pos.qty;
+                let pl = marketValue - costBasis;
+
+                totalAllocated += costBasis;
+                totalCurrent += marketValue;
+                totalPl += pl;
+
+                let statusSignal = "<span class='text-emerald-400 font-bold'>HOLD</span>";
+                let rowAlertClass = "";
+
+                if (isSold) {
+                    statusSignal = "<span class='bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[10px] px-2 py-0.5 rounded font-bold'>REALIZED</span>";
+                    rowAlertClass = "opacity-60 bg-gray-950/40";
+                } else if (currentPrice <= pos.sl) {
+                    statusSignal = "<span class='bg-red-600 text-white text-[10px] px-2 py-0.5 rounded font-bold animate-pulse'>SELL (SL HIT)</span>";
+                    rowAlertClass = "bg-red-950/20";
+                } else if (currentPrice >= pos.t2) {
+                    statusSignal = "<span class='bg-emerald-600 text-white text-[10px] px-2 py-0.5 rounded font-bold'>SELL (T2 TARGET)</span>";
+                    rowAlertClass = "bg-emerald-950/20";
+                } else if (currentPrice >= pos.t1) {
+                    statusSignal = "<span class='text-emerald-400 font-bold block'>HOLD (T1 FILLED)</span>";
+                }
+
+                let tr = document.createElement('tr');
+                tr.className = `hover:bg-gray-900/40 border-b border-gray-800 text-gray-300 transition ${rowAlertClass}`;
+                tr.innerHTML = `
+                    <td class="p-4 font-bold text-white font-mono cursor-pointer hover:text-indigo-400" onclick="routeToAnalytics('${pos.ticker}')">${pos.ticker}</td>
+                    <td class="p-4 font-mono text-xs space-y-1">
+                        <div>Avg Price: <span class="text-white">₹${pos.entryPrice.toFixed(2)}</span></div>
+                        <div class="flex items-center gap-1.5 text-gray-400">
+                            <label for="qty-input-${idx}">Qty:</label>
+                            <input type="number" id="qty-input-${idx}" min="1" value="${pos.qty}" 
+                                ${isSold ? 'disabled' : ''}
+                                oninput="updateVirtualPositionQty(${idx}, this.value)" 
+                                class="w-20 bg-gray-950 border border-gray-800 focus:border-indigo-500 rounded px-1.5 py-0.5 font-bold text-white text-xs focus:outline-none disabled:opacity-50">
+                        </div>
+                    </td>
+                    <td class="p-4 font-mono text-xs text-red-400 font-semibold">₹${pos.sl.toFixed(2)}</td>
+                    <td class="p-4 font-mono text-xs text-emerald-400">
+                        <div>T1: ₹${pos.t1.toFixed(2)}</div>
+                        <div>T2: ₹${pos.t2.toFixed(2)}</div>
+                    </td>
+                    <td class="p-4 font-mono text-xs text-white">
+                        <div class="flex items-center gap-1.5">
+                            ₹${currentPrice.toFixed(2)}
+                            ${isSold ? '' : (liveNSEPrices[pos.ticker] ? '<span class="text-[9px] px-1 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30 font-bold">LIVE</span>' : '<span class="text-[9px] px-1 py-0.5 rounded bg-yellow-500/10 text-yellow-500/70 border border-yellow-500/20 font-bold">SIM</span>')}
+                        </div>
+                        <div class="mt-1">${statusSignal}</div>
+                    </td>
+                    <td class="p-4 font-mono font-bold ${pl >= 0 ? 'text-emerald-400':'text-red-400'}">
+                        ₹${pl.toFixed(2)}
+                        <span class="text-[10px] block font-normal opacity-70">${((pl/costBasis)*100).toFixed(2)}%</span>
+                    </td>
+                    <td class="p-4 text-right space-x-1 whitespace-nowrap">
+                        ${isSold ? `
+                            <span class="text-xs font-semibold bg-gray-900 border border-gray-800 text-gray-500 px-2 py-1 rounded-md inline-block">Closed</span>
+                        ` : `
+                            <button onclick="sellVirtualPosition(${idx}, ${currentPrice})" class="text-xs font-semibold bg-amber-600/20 hover:bg-amber-600 border border-amber-500/30 hover:border-amber-500 text-amber-400 hover:text-white px-2.5 py-1 rounded-md transition cursor-pointer">
+                                Sell
+                            </button>
+                        `}
+                        <button onclick="removeVirtualPosition(${idx})" class="inline-flex items-center justify-center text-xs font-semibold bg-gray-800 hover:bg-red-900/40 hover:text-red-400 p-2 rounded-lg transition text-gray-400 cursor-pointer" title="Remove">
+                            ${SVG.trash}
+                        </button>
+                    </td>
+                `;
+                body.appendChild(tr);
+            });
+
+            updatePortfolioMetrics(totalAllocated, totalCurrent, totalPl);
+            safeCreateIcons();
+
+            // Re-apply focus rules safely to keep user input uninterrupted
+            if (currentFocusedElementId) {
+                const el = document.getElementById(currentFocusedElementId);
+                if (el) {
+                    el.focus();
+                    if(selectionStart !== null) el.setSelectionRange(selectionStart, selectionStart);
+                }
+            }
+            capturePortfolioSnapshot(totalCurrent, totalAllocated, totalPl);
+            
+            // Only feed active open items to the risk visualizer card decks
+            const activePositionsOnly = activeVirtualPortfolio.filter(p => p.status !== "Sold");
+            updateTradingGradeAnalytics(activePositionsOnly);
+            savePortfolioState();
+        }
+
+        function updatePortfolioMetrics(allocated, current, pl) {
+            document.getElementById('vTotalCapital').innerText = `₹${allocated.toLocaleString('en-IN', {maximumFractionDigits:2})}`;
+            document.getElementById('vCurrentValue').innerText = `₹${current.toLocaleString('en-IN', {maximumFractionDigits:2})}`;
+            
+            const plText = document.getElementById('vTotalPl');
+            const plBg = document.getElementById('vTotalPlBg');
+            plText.innerText = `₹${pl.toLocaleString('en-IN', {maximumFractionDigits:2})}`;
+            document.getElementById('vActiveCount').innerText = `${activeVirtualPortfolio.length} Asset Allocations`;
+
+            if(pl >= 0) {
+                plText.className = "text-2xl font-bold font-mono tracking-tight text-emerald-400 mt-1";
+                plBg.className = "bg-emerald-950 text-emerald-400 p-3 rounded-lg";
+            } else {
+                plText.className = "text-2xl font-bold font-mono tracking-tight text-red-400 mt-1";
+                plBg.className = "bg-red-950 text-red-400 p-3 rounded-lg";
+            }
+        }
+
+        function normalizePortfolioRecord(pos) {
+            const entryPrice = Number(pos.entryPrice ?? pos.price ?? 0);
+            const qty = Math.max(1, parseInt(pos.qty ?? 1));
+            const sl = Number(pos.sl ?? (entryPrice * 0.96));
+            const t1 = Number(pos.t1 ?? (entryPrice * 1.03));
+            const t2 = Number(pos.t2 ?? (entryPrice * 1.06));
+            const status = String(pos.status || 'Active');
+            const exitPrice = pos.exitPrice ? Number(pos.exitPrice) : null;
+            return { ticker: String(pos.ticker || '').toUpperCase().trim(), entryPrice, qty, sl, t1, t2, status, exitPrice };
+        }
+        function savePortfolioState(silent = true) {
+            localStorage.setItem('tradingGradeVirtualPortfolio', JSON.stringify(activeVirtualPortfolio));
+            localStorage.setItem('tradingGradePortfolioHistory', JSON.stringify(portfolioHistory));
+            const stateEl = document.getElementById('portfolioSyncState');
+            if(stateEl) stateEl.innerText = silent ? 'Local Auto-Save Enabled' : 'Portfolio saved to this browser';
+        }
+        function loadPortfolioState() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('tradingGradeVirtualPortfolio') || '[]');
+                const savedHistory = JSON.parse(localStorage.getItem('tradingGradePortfolioHistory') || '[]');
+                if(Array.isArray(saved)) activeVirtualPortfolio = saved.map(normalizePortfolioRecord).filter(p => p.ticker);
+                if(Array.isArray(savedHistory)) portfolioHistory = savedHistory.slice(-80);
+            } catch(e) {
+                activeVirtualPortfolio = [];
+                portfolioHistory = [];
+            }
+        }
+        function exportPortfolio() {
+            if(activeVirtualPortfolio.length === 0) {
+                alert('Nothing to save. Add at least one position first.');
+                return;
+            }
+            const packageData = {
+                version: '3.0',
+                exportedAt: new Date().toISOString(),
+                activeVirtualPortfolio,
+                portfolioHistory
+            };
+            const blob = new Blob([JSON.stringify(packageData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `virtual_trading_portfolio_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            const stateEl = document.getElementById('portfolioSyncState');
+            if(stateEl) stateEl.innerText = 'Portable JSON exported successfully';
+        }
+        function importPortfolio(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    const records = Array.isArray(parsed) ? parsed : (parsed.activeVirtualPortfolio || []);
+                    if(!Array.isArray(records)) throw new Error('Invalid portfolio data');
+                    activeVirtualPortfolio = records.map(normalizePortfolioRecord).filter(p => p.ticker);
+                    portfolioHistory = Array.isArray(parsed.portfolioHistory) ? parsed.portfolioHistory.slice(-80) : portfolioHistory;
+                    savePortfolioState(false);
+                    renderVirtualPortfolio();
+                    alert('Portfolio loaded successfully.');
+                } catch(err) {
+                    alert('Failed to load the selected file.');
+                } finally {
+                    event.target.value = '';
+                }
+            };
+            reader.readAsText(file);
+        }
+        function resetPortfolio() {
+            if(!confirm('Clear all virtual positions and local history?')) return;
+            activeVirtualPortfolio = [];
+            portfolioHistory = [];
+            localStorage.removeItem('tradingGradeVirtualPortfolio');
+            localStorage.removeItem('tradingGradePortfolioHistory');
+            const stateEl = document.getElementById('portfolioSyncState');
+            if(stateEl) stateEl.innerText = 'Portfolio reset. Ready for a new setup';
+            renderVirtualPortfolio();
+        }
+        function capturePortfolioSnapshot(totalCurrent, totalAllocated, totalPl) {
+            const stamp = new Date();
+            const point = {
+                ts: stamp.toISOString(),
+                label: stamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                equity: Number(totalCurrent.toFixed(2)),
+                capital: Number(totalAllocated.toFixed(2)),
+                pnl: Number(totalPl.toFixed(2))
+            };
+            const last = portfolioHistory[portfolioHistory.length - 1];
+            if(last && Math.abs(last.equity - point.equity) < 0.01) return;
+            portfolioHistory.push(point);
+            if(portfolioHistory.length > 80) portfolioHistory = portfolioHistory.slice(-80);
+        }
+        function renderEquityCurve() {
+            const svg = document.getElementById('equityCurveChart');
+            if(!svg) return;
+            const series = portfolioHistory.length ? portfolioHistory : [{ label: 'Now', equity: 0, capital: 0, pnl: 0 }];
+            const w = 860, h = 260, left = 54, right = 14, top = 18, bottom = 34;
+            const chartW = w - left - right, chartH = h - top - bottom;
+            const minV = Math.min(...series.map(s => s.equity), 0);
+            const maxV = Math.max(...series.map(s => s.equity), 1);
+            const y = (val) => top + chartH - ((val - minV) / (maxV - minV || 1)) * chartH;
+            const x = (idx) => left + (idx / Math.max(series.length - 1, 1)) * chartW;
+            let grid = '';
+            for(let i = 0; i < 5; i++) {
+                const gy = top + (i / 4) * chartH;
+                const val = (maxV - (i / 4) * (maxV - minV));
+                grid += `<line x1="${left}" y1="${gy}" x2="${w-right}" y2="${gy}" />`;
+                grid += `<text x="8" y="${gy+4}" fill="#94a3b8" font-size="11">₹${val.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</text>`;
+            }
+            const path = series.map((p, idx) => `${idx===0?'M':'L'} ${x(idx)} ${y(p.equity)}`).join(' ');
+            const area = `${path} L ${x(series.length-1)} ${top+chartH} L ${x(0)} ${top+chartH} Z`;
+            const markers = series.map((p, idx) => `<circle cx="${x(idx)}" cy="${y(p.equity)}" r="3.2" fill="#6366f1" />`).join('');
+            const last = series[series.length-1];
+            svg.innerHTML = `
+                <defs>
+                    <linearGradient id="equityFill" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stop-color="rgba(99,102,241,0.45)" />
+                        <stop offset="100%" stop-color="rgba(99,102,241,0.02)" />
+                    </linearGradient>
+                </defs>
+                <rect x="0" y="0" width="${w}" height="${h}" fill="#020617" rx="14"></rect>
+                <g class="equity-grid">${grid}</g>
+                <path d="${area}" fill="url(#equityFill)"></path>
+                <path d="${path}" fill="none" stroke="#818cf8" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"></path>
+                ${markers}
+                <text x="${left}" y="${h-10}" fill="#94a3b8" font-size="11">First snapshot</text>
+                <text x="${w-right-86}" y="${h-10}" fill="#94a3b8" font-size="11">Latest snapshot</text>
+                <g transform="translate(${w-235}, 16)">
+                    <rect x="0" y="0" width="220" height="54" rx="12" fill="rgba(17,24,39,0.84)" stroke="rgba(55,65,81,0.95)"/>
+                    <text x="14" y="20" fill="#94a3b8" font-size="11">Latest Equity</text>
+                    <text x="14" y="40" fill="#f8fafc" font-size="16" font-weight="700">₹${Number(last.equity || 0).toLocaleString('en-IN', { maximumFractionDigits:2 })}</text>
+                    <text x="126" y="20" fill="#94a3b8" font-size="11">PnL</text>
+                    <text x="126" y="40" fill="${(last.pnl || 0) >= 0 ? '#34d399' : '#f87171'}" font-size="14" font-weight="700">₹${Number(last.pnl || 0).toLocaleString('en-IN', { maximumFractionDigits:2 })}</text>
+                </g>
+            `;
+            document.getElementById('vSnapshotCount').innerText = `${series.length} snapshot${series.length === 1 ? '' : 's'}`;
+        }
+        function updateTradingGradeAnalytics(openPositions) {
+            const exposure = openPositions.reduce((sum, pos) => sum + (pos.entryPrice * pos.qty), 0);
+            let avgRR = 0;
+            if(openPositions.length) {
+                avgRR = openPositions.reduce((sum, pos) => sum + (((pos.t1 - pos.entryPrice) / (pos.entryPrice - pos.sl || 1)) || 0), 0) / openPositions.length;
+            }
+            const enriched = openPositions.map(pos => {
+                let currentPrice;
+                if (liveNSEPrices[pos.ticker]) {
+                    currentPrice = liveNSEPrices[pos.ticker];
+                } else if (globalScanDataset[pos.ticker]) {
+                    const simData = globalScanDataset[pos.ticker];
+                    const simBasePrice = simData.raw && simData.raw.length > 0 ? simData.raw[0].open : simData.price;
+                    const simChangePct = simBasePrice > 0 ? (simData.price - simBasePrice) / simBasePrice : 0;
+                    currentPrice = pos.entryPrice * (1 + simChangePct);
+                } else {
+                    currentPrice = pos.entryPrice;
+                }
+                const pnl = (currentPrice - pos.entryPrice) * pos.qty;
+                return { ...pos, currentPrice, pnl, pnlPct: ((currentPrice - pos.entryPrice) / (pos.entryPrice || 1)) * 100 };
+            });
+            const best = enriched.length ? enriched.reduce((a,b) => a.pnl > b.pnl ? a : b) : null;
+            const worst = enriched.length ? enriched.reduce((a,b) => a.pnl < b.pnl ? a : b) : null;
+            document.getElementById('vExposure').innerText = `₹${exposure.toLocaleString('en-IN', { maximumFractionDigits:2 })}`;
+            document.getElementById('vAvgRR').innerText = avgRR.toFixed(2);
+            document.getElementById('vBestPos').innerHTML = best ? `${best.ticker} <span class="text-emerald-400 font-mono block">₹${best.pnl.toFixed(2)} (${best.pnlPct.toFixed(2)}%)</span>` : '--';
+            document.getElementById('vWorstPos').innerHTML = worst ? `${worst.ticker} <span class="text-red-400 font-mono block">₹${worst.pnl.toFixed(2)} (${worst.pnlPct.toFixed(2)}%)</span>` : '--';
+            const riskGrid = document.getElementById('riskCommandGrid');
+            if(!enriched.length) {
+                riskGrid.innerHTML = `<div class="mini-stat rounded-xl p-3 flex items-center justify-between"><span class="text-sm text-gray-400">No open positions yet.</span><span class="text-xs text-gray-500">Awaiting data</span></div>`;
+                renderEquityCurve();
+                return;
+            }
+            riskGrid.innerHTML = enriched.map(pos => {
+                const toSL = ((pos.currentPrice - pos.sl) / (pos.currentPrice || 1)) * 100;
+                const toT1 = ((pos.t1 - pos.currentPrice) / (pos.currentPrice || 1)) * 100;
+                let status = 'In Range';
+                let statusCls = 'text-amber-300';
+                if(pos.currentPrice <= pos.sl) { status = 'Stop Breach'; statusCls = 'text-red-400'; }
+                else if(pos.currentPrice >= pos.t2) { status = 'Target 2 Hit'; statusCls = 'text-emerald-400'; }
+                else if(pos.currentPrice >= pos.t1) { status = 'Target 1 Cleared'; statusCls = 'text-emerald-300'; }
+                return `
+                    <div class="mini-stat rounded-xl p-3">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="text-sm font-bold text-white">${pos.ticker}</p>
+                                <p class="text-[11px] text-gray-400 font-mono">Entry ₹${pos.entryPrice.toFixed(2)} · Live ₹${pos.currentPrice.toFixed(2)}</p>
+                            </div>
+                            <span class="text-xs font-semibold ${statusCls}">${status}</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mt-3 text-[11px]">
+                            <div class="bg-gray-950/70 border border-gray-800 rounded-lg p-2">Distance to SL <span class="block mt-1 font-mono ${toSL < 2 ? 'text-red-400' : 'text-gray-200'}">${toSL.toFixed(2)}%</span></div>
+                            <div class="bg-gray-950/70 border border-gray-800 rounded-lg p-2">Distance to T1 <span class="block mt-1 font-mono ${toT1 < 1 ? 'text-emerald-400' : 'text-gray-200'}">${toT1.toFixed(2)}%</span></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            renderEquityCurve();
+        }
+
+        // --- LIVE NSE PRICE FETCHER (Yahoo Finance v8/chart — ~15 min delayed, free, no key) ---
+
+        let _priceAutoRefreshTimer = null;
+        let _countdownTimer        = null;
+        let _nextRefreshAt         = null;
+        const PRICE_REFRESH_MS     = 5 * 60 * 1000; // 5 minutes
+
+        // Build proxy fetcher list for a given Yahoo Finance URL
+        function _buildProxies(yahooUrl) {
+            return [
+                () => fetch(`https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`, {
+                    headers: { 'User-Agent': 'Mozilla/5.0' },
+                    signal: AbortSignal.timeout(9000)
+                }).then(r => r.json()),
+
+                () => fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(yahooUrl)}`, {
+                    signal: AbortSignal.timeout(9000)
+                }).then(r => r.json()).then(w => JSON.parse(w.contents)),
+
+                () => fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(yahooUrl)}`, {
+                    signal: AbortSignal.timeout(9000)
+                }).then(r => r.json()),
+
+                () => fetch(`https://thingproxy.freeboard.io/fetch/${yahooUrl}`, {
+                    signal: AbortSignal.timeout(9000)
+                }).then(r => r.json()),
+            ];
+        }
+
+        // Fetch a single NSE ticker via Yahoo Finance v8/chart through a CORS proxy.
+        async function _fetchSingleNSEPrice(ticker) {
+            const symbol = ticker.replace('&', '%26') + '.NS';
+            const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=2d`;
+            for (const tryProxy of _buildProxies(yahooUrl)) {
+                try {
+                    const data  = await tryProxy();
+                    const meta  = data?.chart?.result?.[0]?.meta;
+                    if (!meta) continue;
+                    const price = meta.regularMarketPrice ?? meta.previousClose ?? null;
+                    const mktState = meta.marketState ?? '';
+                    if (price && price > 0) return { price, mktState };
+                } catch (_) { /* try next proxy */ }
+            }
+            return null;
+        }
+
+        function _setLivePriceUI(state, message, showCountdown) {
+            const bar    = document.getElementById('livePriceStatusBar');
+            const dot    = document.getElementById('livePriceStatusDot');
+            const txt    = document.getElementById('livePriceStatus');
+            const cdWrap = document.getElementById('liveCountdown');
+            if (!bar) return;
+            bar.classList.remove('hidden');
+            bar.style.display = 'flex';
+            txt.textContent   = message;
+            if (state === 'loading') {
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-yellow-400 inline-block flex-shrink-0 animate-pulse';
+                txt.className = 'text-yellow-300';
+            } else if (state === 'ok') {
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block flex-shrink-0';
+                txt.className = 'text-emerald-400';
+            } else {
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-red-400 inline-block flex-shrink-0';
+                txt.className = 'text-yellow-400';
+            }
+            if (cdWrap) {
+                cdWrap.classList.toggle('hidden', !showCountdown);
+            }
+        }
+
+        function _startCountdown() {
+            if (_countdownTimer) clearInterval(_countdownTimer);
+            _countdownTimer = setInterval(() => {
+                const el = document.getElementById('liveCountdownSec');
+                if (!el || !_nextRefreshAt) return;
+                const s = Math.max(0, Math.round((_nextRefreshAt - Date.now()) / 1000));
+                el.textContent = `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+            }, 1000);
+        }
+
+        function _scheduleAutoRefresh() {
+            if (_priceAutoRefreshTimer) clearInterval(_priceAutoRefreshTimer);
+            _nextRefreshAt = Date.now() + PRICE_REFRESH_MS;
+            _startCountdown();
+            _priceAutoRefreshTimer = setInterval(() => {
+                _nextRefreshAt = Date.now() + PRICE_REFRESH_MS;
+                fetchLiveNSEPrices(false);
+            }, PRICE_REFRESH_MS);
+        }
+
+        async function fetchLiveNSEPrices(manual = false) {
+            if (activeVirtualPortfolio.length === 0) {
+                if (manual) alert('Add at least one position before refreshing prices.');
+                return;
+            }
+
+            const btn = document.getElementById('livePriceBtn');
+            if (btn) btn.disabled = true;
+            _setLivePriceUI('loading', 'Fetching prices…', false);
+
+            const tickers      = [...new Set(activeVirtualPortfolio.map(p => p.ticker))];
+            let fetchedCount   = 0;
+            let lastMktState   = '';
+
+            // Fetch each ticker individually (v8/chart is per-symbol only)
+            // Small delay between requests to avoid rate-limiting
+            for (let i = 0; i < tickers.length; i++) {
+                const ticker = tickers[i];
+                _setLivePriceUI('loading', `Fetching ${i+1}/${tickers.length}: ${ticker}…`, false);
+                try {
+                    const result = await _fetchSingleNSEPrice(ticker);
+                    if (result) {
+                        liveNSEPrices[ticker] = result.price;
+                        if (globalScanDataset[ticker]) globalScanDataset[ticker].price = result.price;
+                        if (result.mktState) lastMktState = result.mktState;
+                        fetchedCount++;
+                    }
+                } catch (_) { /* skip this ticker */ }
+                if (i < tickers.length - 1) await new Promise(r => setTimeout(r, 120));
+            }
+
+            liveNSELastFetched = new Date();
+            const timeStr = liveNSELastFetched.toLocaleTimeString('en-IN', {
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+
+            const mktLabel = lastMktState === 'REGULAR' ? '🟢 Market Open'
+                           : lastMktState === 'PRE'     ? '🟡 Pre-Market'
+                           : lastMktState === 'POST'    ? '🟡 Post-Market'
+                           : '🔴 Closed / Delayed';
+
+            if (fetchedCount > 0) {
+                _setLivePriceUI('ok',
+                    `${fetchedCount}/${tickers.length} prices updated · ${timeStr} · ${mktLabel}`,
+                    true
+                );
+                const badge = document.getElementById('liveBadgeHeader');
+                if (badge) badge.classList.remove('hidden');
+                // Sync screener table prices too
+                if (Object.keys(globalScanDataset).length > 0) {
+                    /* screener removed */
+                    populateCards();
+                    safeCreateIcons();
+                }
+            } else {
+                _setLivePriceUI('error', '⚠ All proxies failed — using simulated prices', true);
+            }
+
+            _scheduleAutoRefresh();
+
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = SVG.wifi + ' Refresh Prices';
+                safeCreateIcons();
+            }
+            renderVirtualPortfolio();
+        }
+
+        
+        // ============================================================
+        // === MY PICKS — Persistence Migration & P&L Engine (v3.0) ===
+        // ============================================================
+        (function migrateMySwingToMyPicks() {
+            // Promote legacy keys (only if new keys aren't already set)
+            const legacyH = localStorage.getItem('mySwingHoldings');
+            const legacyT = localStorage.getItem('mySwingHistory');
+            const newH    = localStorage.getItem('myPicksHoldings');
+            const newT    = localStorage.getItem('myPicksTransactions');
+            if (legacyH && !newH) localStorage.setItem('myPicksHoldings', legacyH);
+            if (legacyT && !newT) localStorage.setItem('myPicksTransactions', legacyT);
+        })();
+
+        // Override the save layer to write to BOTH legacy and new keys (back-compat)
+        const __origMySwingSave = mySwingSave;
+        mySwingSave = function() {
+            __origMySwingSave();
+            localStorage.setItem('myPicksHoldings',     JSON.stringify(mySwingHoldings));
+            localStorage.setItem('myPicksTransactions', JSON.stringify(mySwingHistory));
+        };
+
+        // Partial / full sell with transaction tracking
+        let __psSellIdx = -1;
+        function mySwingOpenSell(idx) {
+            const h = mySwingHoldings[idx];
+            if (!h) return;
+            __psSellIdx = idx;
+            const ltp = h.ltp || h.avgPrice;
+            const pnl = (ltp - h.avgPrice) * h.qty;
+            document.getElementById('psTicker').textContent    = h.ticker;
+            document.getElementById('psAvg').textContent       = '₹' + h.avgPrice.toFixed(2);
+            document.getElementById('psLtp').textContent       = '₹' + ltp.toFixed(2);
+            document.getElementById('psQty').textContent       = h.qty;
+            const pnlEl = document.getElementById('psPnl');
+            pnlEl.textContent = '₹' + pnl.toFixed(2);
+            pnlEl.className   = 'font-mono font-bold ' + (pnl >= 0 ? 'text-emerald-400' : 'text-red-400');
+            document.getElementById('psSellQty').value   = h.qty;
+            document.getElementById('psSellQty').max     = h.qty;
+            document.getElementById('psSellPrice').value = ltp.toFixed(2);
+            document.getElementById('partialSellModal').classList.remove('hidden');
+        }
+        function closePartialSellModal() {
+            document.getElementById('partialSellModal').classList.add('hidden');
+            __psSellIdx = -1;
+        }
+        function _recordSell(idx, qty, sellPrice) {
+            const h = mySwingHoldings[idx];
+            if (!h || qty <= 0 || qty > h.qty) { alert('Invalid quantity.'); return; }
+            const pl = (sellPrice - h.avgPrice) * qty;
+            mySwingHistory.unshift({
+                ticker:    h.ticker,
+                avgPrice:  h.avgPrice,
+                qty:       qty,
+                sellPrice: sellPrice,
+                pl:        pl,
+                date:      new Date().toLocaleDateString('en-IN'),
+                timestamp: new Date().toISOString(),
+                type:      qty === h.qty ? 'FULL' : 'PARTIAL'
+            });
+            if (qty === h.qty) {
+                mySwingHoldings.splice(idx, 1);
+            } else {
+                h.qty -= qty;
+            }
+            mySwingSave();
+            mySwingRender();
+        }
+        function confirmPartialSell() {
+            if (__psSellIdx < 0) return;
+            const qty   = parseInt(document.getElementById('psSellQty').value);
+            const price = parseFloat(document.getElementById('psSellPrice').value);
+            if (isNaN(qty) || isNaN(price) || qty <= 0 || price <= 0) { alert('Enter a valid qty and price.'); return; }
+            _recordSell(__psSellIdx, qty, price);
+            closePartialSellModal();
+        }
+        function confirmFullSell() {
+            if (__psSellIdx < 0) return;
+            const h     = mySwingHoldings[__psSellIdx];
+            const price = parseFloat(document.getElementById('psSellPrice').value) || (h.ltp || h.avgPrice);
+            _recordSell(__psSellIdx, h.qty, price);
+            closePartialSellModal();
+        }
+
+        // Replace legacy single-click sell with the new modal-driven flow
+        mySwingSellStock = function(idx) { mySwingOpenSell(idx); };
+
+        // P&L Dashboard recomputation
+        function recomputePnLDashboard() {
+            let uProfit = 0, uLoss = 0, invested = 0, current = 0;
+            mySwingHoldings.forEach(h => {
+                const ltp = h.ltp || h.avgPrice;
+                const pl  = (ltp - h.avgPrice) * h.qty;
+                invested += h.avgPrice * h.qty;
+                current  += ltp * h.qty;
+                if (pl >= 0) uProfit += pl; else uLoss += pl;
+            });
+            const uNet = uProfit + uLoss;
+            const uPct = invested > 0 ? (uNet / invested) * 100 : 0;
+
+            let rProfit = 0, rLoss = 0, wins = 0;
+            mySwingHistory.forEach(t => {
+                if (t.pl >= 0) { rProfit += t.pl; wins++; } else rLoss += t.pl;
+            });
+            const rNet     = rProfit + rLoss;
+            const trades   = mySwingHistory.length;
+            const winRate  = trades > 0 ? (wins / trades) * 100 : 0;
+            const avgGain  = wins > 0 ? rProfit / wins : 0;
+            const avgLoss  = (trades - wins) > 0 ? rLoss / (trades - wins) : 0;
+            const totalPnl = uNet + rNet;
+            const totalPct = invested + Math.abs(rNet) > 0 ? (totalPnl / (invested + Math.abs(rNet))) * 100 : 0;
+
+            const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+            set('pnl-u-profit', '₹' + uProfit.toLocaleString('en-IN', { maximumFractionDigits: 0 }));
+            set('pnl-u-loss',   '₹' + uLoss.toLocaleString('en-IN', { maximumFractionDigits: 0 }));
+            set('pnl-u-net',    '₹' + uNet.toLocaleString('en-IN', { maximumFractionDigits: 0 }));
+            set('pnl-u-pct',    uPct.toFixed(2) + '%');
+            set('pnl-r-profit', '₹' + rProfit.toLocaleString('en-IN', { maximumFractionDigits: 0 }));
+            set('pnl-r-loss',   '₹' + rLoss.toLocaleString('en-IN', { maximumFractionDigits: 0 }));
+            set('pnl-r-net',    '₹' + rNet.toLocaleString('en-IN', { maximumFractionDigits: 0 }));
+            set('pnl-r-trades', String(trades));
+            set('pnl-c-total',  '₹' + totalPnl.toLocaleString('en-IN', { maximumFractionDigits: 0 }));
+            set('pnl-c-pct',    totalPct.toFixed(2) + '%');
+            set('pnl-c-win',    winRate.toFixed(1) + '%');
+            set('pnl-c-avgg',   '₹' + avgGain.toLocaleString('en-IN', { maximumFractionDigits: 0 }));
+            set('pnl-c-avgl',   '₹' + avgLoss.toLocaleString('en-IN', { maximumFractionDigits: 0 }));
+
+            // Colour the combined total
+            const totalEl = document.getElementById('pnl-c-total');
+            if (totalEl) totalEl.className = 'font-mono font-bold ' + (totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400');
+        }
+
+        // Hook render: every time the picks render, recompute the P&L dashboard
+        const __origMySwingRender = mySwingRender;
+        mySwingRender = function() {
+            __origMySwingRender();
+            recomputePnLDashboard();
+        };
+
+
+        // --- 13. CORE INITIALIZATION ROUTINE ---
+        window.addEventListener('DOMContentLoaded', () => {
+            loadPortfolioState();
+            safeCreateIcons();
+            runGlobalScan();
+            renderVirtualPortfolio();
+            mySwingRender();
+
+            // Auto-fetch real prices on load if positions exist
+            if (activeVirtualPortfolio.length > 0) {
+                fetchLiveNSEPrices(false);
+            }
+
+            // Keep technical indicators fresh every 5 minutes
+            setInterval(() => { runGlobalScan(); }, 300000);
+        });
+    </script>
+</body>
+</html>
